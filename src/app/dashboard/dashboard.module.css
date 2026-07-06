@@ -17,6 +17,9 @@
   font-weight: 700;
   color: var(--accent);
   border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .sidebarNav {

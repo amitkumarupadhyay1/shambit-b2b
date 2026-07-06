@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import api from '@/lib/api';
 import styles from './login.module.css';
 
@@ -39,6 +40,9 @@ export default function LoginPage() {
   return (
     <div className={styles.loginContainer}>
       <div className={`glass-panel ${styles.loginBox}`}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+          <Image src="/logo.svg" alt="ShamBit Logo" width={64} height={64} />
+        </div>
         <h1 className={styles.title}>ShamBit B2B Agent Portal</h1>
         <p className={styles.subtitle}>Sign in to access your ledger and manage bookings.</p>
         

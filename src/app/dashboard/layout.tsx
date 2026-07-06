@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import styles from './dashboard.module.css';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -25,7 +26,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className={styles.layout}>
       <aside className={styles.sidebar}>
         <div className={styles.sidebarBrand}>
-          ShamBit B2B
+          <Image src="/logo.svg" alt="ShamBit Logo" width={32} height={32} />
+          <span>ShamBit B2B</span>
         </div>
         <nav className={styles.sidebarNav}>
           <Link href="/dashboard" className={`${styles.navItem} ${pathname === '/dashboard' ? styles.active : ''}`}>
