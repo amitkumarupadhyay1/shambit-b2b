@@ -1,0 +1,185 @@
+.checkoutContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.pageTitle {
+  font-size: 1.5rem;
+  color: var(--primary);
+}
+
+.checkoutLayout {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+.mainForm {
+  flex: 1;
+}
+
+.formPanel {
+  padding: 2rem;
+}
+
+.sectionTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--primary);
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5rem;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.inputGroup label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--primary);
+}
+
+.b2bOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background-color: #f8fafc;
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  border: 1px dashed var(--border);
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  cursor: pointer;
+}
+
+.checkboxLabel input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.25rem;
+  accent-color: var(--accent);
+}
+
+.checkboxText {
+  display: flex;
+  flex-direction: column;
+}
+
+.checkboxText strong {
+  font-size: 0.95rem;
+  color: var(--primary);
+}
+
+.checkboxText small {
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.formFooter {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.formFooter button {
+  padding: 1rem 2.5rem;
+  font-size: 1rem;
+}
+
+/* Sidebar Summary */
+.sidebar {
+  width: 350px;
+  position: sticky;
+  top: 2rem;
+}
+
+.summaryPanel {
+  padding: 1.5rem;
+}
+
+.summaryTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--primary);
+  margin-bottom: 1.25rem;
+}
+
+.summaryItem {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  font-size: 0.95rem;
+}
+
+.summaryItem span {
+  color: #64748b;
+}
+
+.summaryItem strong {
+  color: var(--primary);
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.5rem 0;
+}
+
+.ledgerWarning {
+  display: flex;
+  gap: 0.75rem;
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  padding: 1rem;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.successAlert {
+  background-color: #d1fae5;
+  color: #065f46;
+  padding: 1rem;
+  border-radius: var(--radius);
+  border: 1px solid #34d399;
+}
+
+.errorAlert {
+  background-color: #fef2f2;
+  color: var(--danger);
+  padding: 1rem;
+  border-radius: var(--radius);
+  border: 1px solid #fca5a5;
+}
+
+@media (max-width: 1024px) {
+  .checkoutLayout {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .grid2 {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,204 @@
+.searchContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.pageTitle {
+  font-size: 1.5rem;
+  color: var(--primary);
+}
+
+.searchBox {
+  padding: 1.5rem;
+}
+
+.searchForm {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.inputGroup label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--primary);
+}
+
+.buttonGroup button {
+  height: 46px; /* Match input height roughly */
+  padding: 0 2rem;
+}
+
+.error {
+  color: var(--danger);
+  background: #fef2f2;
+  padding: 1rem;
+  border-radius: var(--radius);
+  border: 1px solid #fca5a5;
+}
+
+.resultsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 2rem;
+}
+
+.hotelCard {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hotelCard:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.imageWrapper {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  background-color: #e2e8f0;
+}
+
+.hotelImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.downloadBtn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s;
+  backdrop-filter: blur(4px);
+}
+
+.downloadBtn:hover {
+  background: white;
+  transform: scale(1.05);
+}
+
+.hotelDetails {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.hotelName {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--primary);
+  margin-bottom: 0.25rem;
+}
+
+.hotelAddress {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+}
+
+.rating {
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.pricingBox {
+  background-color: #f8fafc;
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-top: auto;
+  margin-bottom: 1.5rem;
+  border: 1px dashed var(--border);
+}
+
+.priceRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.strikeThrough {
+  text-decoration: line-through;
+}
+
+.netLabel {
+  font-weight: 600;
+  color: var(--primary);
+  font-size: 1rem;
+}
+
+.netValue {
+  font-weight: 700;
+  color: var(--success);
+  font-size: 1.25rem;
+}
+
+.tacRow {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--accent);
+  display: flex;
+  justify-content: space-between;
+}
+
+.bookBtn {
+  width: 100%;
+}
+
+.emptyState {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 4rem;
+  color: #64748b;
+  background-color: var(--card);
+  border-radius: var(--radius);
+  border: 1px dashed var(--border);
+}
+
+@media (max-width: 1024px) {
+  .searchForm {
+    grid-template-columns: 1fr 1fr;
+  }
+  .buttonGroup {
+    grid-column: 1 / -1;
+  }
+  .buttonGroup button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .searchForm {
+    grid-template-columns: 1fr;
+  }
+}
