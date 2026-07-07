@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
-import styles from './search.module.css';
+import { Search, Download, Star } from 'lucide-react';
 
 interface HotelResult {
   id: number;
@@ -46,7 +46,6 @@ export default function SearchPage() {
           adults: adults
         }
       });
-      // The API returns { status: 'success', results: [...] } or just an array
       const hits = response.data.results || response.data || [];
       setResults(hits);
     } catch {
@@ -57,7 +56,6 @@ export default function SearchPage() {
   };
 
   const handleDownloadImages = async (hotelName: string, images: Array<{ id: number; image: string; is_primary: boolean }>) => {
-    // Simple implementation: trigger download for each image
     images.forEach(async (img) => {
       try {
         const response = await fetch(img.image);
@@ -65,7 +63,7 @@ export default function SearchPage() {
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `${hotelName.replace(/\s+/g, '_')}_${img.id}.jpg`;
+        link.download = `${hotelName.replace(/\\s+/g, '_')}_${img.id}.jpg`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -80,125 +78,133 @@ export default function SearchPage() {
   };
 
   return (
-    <div className={styles.searchContainer}>
-      <h1 className={styles.pageTitle}>B2B Hotel Search</h1>
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-slate-900 font-playfair">B2B Hotel Search</h1>
       
-      <div className={`glass-panel ${styles.searchBox}`}>
-        <form onSubmit={handleSearch} className={styles.searchForm}>
-          <div className={styles.inputGroup}>
-            <label>Destination / Hotel Name</label>
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+        <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+          <div className="md:col-span-2">
+            <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">Destination / Hotel Name</label>
             <input 
               type="text" 
-              className="input-field"
+              className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm transition-all bg-slate-50 outline-none"
               placeholder="e.g., Ayodhya, Prayagraj"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               required
             />
           </div>
-          <div className={styles.inputGroup}>
-            <label>Check In</label>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">Check In</label>
             <input 
               type="date" 
-              className="input-field"
+              className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm transition-all bg-slate-50 outline-none"
               value={checkIn}
               onChange={(e) => setCheckIn(e.target.value)}
               required
             />
           </div>
-          <div className={styles.inputGroup}>
-            <label>Check Out</label>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">Check Out</label>
             <input 
               type="date" 
-              className="input-field"
+              className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm transition-all bg-slate-50 outline-none"
               value={checkOut}
               onChange={(e) => setCheckOut(e.target.value)}
               required
             />
           </div>
-          <div className={styles.inputGroup}>
-            <label>Adults</label>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">Adults</label>
             <input 
               type="number" 
               min="1"
-              className="input-field"
+              className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm transition-all bg-slate-50 outline-none"
               value={adults}
               onChange={(e) => setAdults(Number(e.target.value))}
               required
             />
           </div>
-          <div className={styles.buttonGroup}>
-            <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? 'Searching...' : 'Search'}
+          <div className="md:col-span-5 flex justify-end mt-2">
+            <button 
+              type="submit" 
+              className="flex items-center justify-center py-3 px-8 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-orange-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-all disabled:opacity-70 disabled:cursor-not-allowed transform hover:-translate-y-0.5"
+              disabled={loading}
+            >
+              <Search className="mr-2 h-4 w-4" />
+              {loading ? 'Searching...' : 'Search Inventory'}
             </button>
           </div>
         </form>
       </div>
 
-      {error && <div className={styles.error}>{error}</div>}
+      {error && <div className="p-4 rounded-xl bg-red-50 text-red-700 border border-red-100">{error}</div>}
 
-      <div className={styles.resultsGrid}>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {results.map((hotel) => {
           const primaryImage = hotel.images?.find(i => i.is_primary)?.image || hotel.images?.[0]?.image || '/placeholder-hotel.jpg';
           
           return (
-            <div key={hotel.id} className={`glass-panel ${styles.hotelCard}`}>
-              <div className={styles.imageWrapper}>
+            <div key={hotel.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm flex flex-col transition-all hover:shadow-md">
+              <div className="relative h-48 w-full group">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={primaryImage} alt={hotel.name} className={styles.hotelImage} />
+                <img src={primaryImage} alt={hotel.name} className="object-cover w-full h-full" />
                 <button 
                   onClick={() => handleDownloadImages(hotel.name, hotel.images)}
-                  className={styles.downloadBtn}
+                  className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm text-slate-800 p-2 rounded-lg text-xs font-semibold shadow-sm flex items-center hover:bg-white transition-colors opacity-0 group-hover:opacity-100"
                   title="Download all photos to share via WhatsApp"
                 >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                  </svg>
+                  <Download className="h-3.5 w-3.5 mr-1.5" />
                   Get Media
                 </button>
               </div>
-              <div className={styles.hotelDetails}>
-                <h3 className={styles.hotelName}>{hotel.name}</h3>
-                <p className={styles.hotelAddress}>{hotel.address}</p>
-                <div className={styles.rating}>
-                  {Array(hotel.star_rating).fill('⭐').join('')}
-                </div>
-                
-                {hotel.b2b_pricing && (
-                  <div className={styles.pricingBox}>
-                    <div className={styles.priceRow}>
-                      <span>Gross Rate:</span>
-                      <span className={styles.strikeThrough}>₹{hotel.b2b_pricing.base_price}</span>
-                    </div>
-                    <div className={styles.priceRow}>
-                      <span className={styles.netLabel}>B2B Net Rate:</span>
-                      <span className={styles.netValue}>₹{hotel.b2b_pricing.net_rate}</span>
-                    </div>
-                    <div className={styles.tacRow}>
-                      Your Commission (TAC): <span>₹{hotel.b2b_pricing.tac_amount}</span>
-                    </div>
+              
+              <div className="p-5 flex flex-col flex-1">
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-playfair text-xl font-bold text-slate-900 leading-tight">{hotel.name}</h3>
+                  <div className="flex bg-amber-50 px-1.5 py-0.5 rounded text-amber-500">
+                    <Star className="w-3.5 h-3.5 fill-current" />
+                    <span className="text-xs font-bold ml-1">{hotel.star_rating}</span>
                   </div>
-                )}
+                </div>
+                <p className="text-xs text-slate-500 mb-4 line-clamp-2">{hotel.address}</p>
                 
-                <button 
-                  onClick={() => proceedToCheckout(hotel.id)}
-                  className={`btn-primary ${styles.bookBtn}`}
-                >
-                  Book Now
-                </button>
+                <div className="mt-auto">
+                  {hotel.b2b_pricing && (
+                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 mb-4 space-y-1.5">
+                      <div className="flex justify-between text-xs text-slate-500">
+                        <span>Gross Rate:</span>
+                        <span className="line-through">₹{hotel.b2b_pricing.base_price}</span>
+                      </div>
+                      <div className="flex justify-between font-semibold">
+                        <span className="text-sm text-slate-700">B2B Net Rate:</span>
+                        <span className="text-sm text-orange-600">₹{hotel.b2b_pricing.net_rate}</span>
+                      </div>
+                      <div className="flex justify-between text-xs pt-1 border-t border-slate-200 mt-1">
+                        <span className="text-green-600 font-medium">Your Commission (TAC):</span>
+                        <span className="text-green-700 font-bold">₹{hotel.b2b_pricing.tac_amount}</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <button 
+                    onClick={() => proceedToCheckout(hotel.id)}
+                    className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 focus:outline-none transition-all"
+                  >
+                    Book Now
+                  </button>
+                </div>
               </div>
             </div>
           );
         })}
-        
-        {!loading && results.length === 0 && query && !error && (
-          <div className={styles.emptyState}>
-            No B2B inventory found for your search criteria.
-          </div>
-        )}
       </div>
+      
+      {!loading && results.length === 0 && query && !error && (
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-12 text-center">
+          <p className="text-slate-500">No B2B inventory found for your search criteria.</p>
+        </div>
+      )}
     </div>
   );
 }

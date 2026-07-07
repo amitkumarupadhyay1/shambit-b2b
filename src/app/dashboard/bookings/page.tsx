@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import api from '@/lib/api';
-import styles from './bookings.module.css';
 
 export default function BookingsPage() {
   const [bookingId, setBookingId] = useState('');
@@ -54,25 +53,25 @@ export default function BookingsPage() {
   };
 
   return (
-    <div className={styles.bookingsContainer}>
-      <h1 className={styles.pageTitle}>My Bookings & KYC</h1>
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-slate-900 font-playfair">My Bookings & KYC</h1>
       
-      <div className={`glass-panel ${styles.uploadPanel}`}>
-        <h2 className={styles.sectionTitle}>Upload Traveller KYC / Aadhaar</h2>
-        <p className={styles.description}>
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 lg:p-8 shadow-sm">
+        <h2 className="text-xl font-semibold text-slate-800 mb-2">Upload Traveller KYC / Aadhaar</h2>
+        <p className="text-sm text-slate-600 mb-6">
           For VIP Darshan requests and standard compliance, please upload the primary guest&apos;s Aadhaar card. 
           The document will be securely stored and marked as pending verification by the admin.
         </p>
 
-        {message && <div className={styles.successAlert}>{message}</div>}
-        {error && <div className={styles.errorAlert}>{error}</div>}
+        {message && <div className="mb-6 p-4 rounded-xl bg-green-50 text-green-700 border border-green-100">{message}</div>}
+        {error && <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-700 border border-red-100">{error}</div>}
 
-        <form onSubmit={handleUpload} className={styles.uploadForm}>
-          <div className={styles.inputGroup}>
-            <label>Booking ID</label>
+        <form onSubmit={handleUpload} className="space-y-5 max-w-lg">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Booking ID</label>
             <input 
               type="text" 
-              className="input-field" 
+              className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm transition-all bg-slate-50 outline-none" 
               value={bookingId}
               onChange={e => setBookingId(e.target.value)}
               placeholder="e.g. 1042"
@@ -80,10 +79,10 @@ export default function BookingsPage() {
             />
           </div>
 
-          <div className={styles.inputGroup}>
-            <label>Document Type</label>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Document Type</label>
             <select 
-              className="input-field" 
+              className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm transition-all bg-slate-50 outline-none" 
               value={documentType}
               onChange={e => setDocumentType(e.target.value)}
               required
@@ -94,19 +93,23 @@ export default function BookingsPage() {
             </select>
           </div>
 
-          <div className={styles.inputGroup}>
-            <label>Upload File</label>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Upload File</label>
             <input 
               type="file" 
-              className={styles.fileInput}
+              className="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-medium file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 transition-all border border-slate-200 rounded-xl bg-slate-50"
               onChange={handleFileChange}
               accept=".pdf,.jpg,.jpeg,.png"
               required 
             />
-            <small className={styles.helpText}>Supported formats: PDF, JPG, PNG. Max 5MB.</small>
+            <small className="mt-2 block text-xs text-slate-500">Supported formats: PDF, JPG, PNG. Max 5MB.</small>
           </div>
 
-          <button type="submit" className="btn-primary" disabled={loading || !file || !bookingId}>
+          <button 
+            type="submit" 
+            className="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-orange-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-all disabled:opacity-70 disabled:cursor-not-allowed transform hover:-translate-y-0.5 mt-4" 
+            disabled={loading || !file || !bookingId}
+          >
             {loading ? 'Uploading Securely...' : 'Upload KYC Document'}
           </button>
         </form>

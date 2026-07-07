@@ -3,19 +3,34 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.4.0",
+    "@marsidev/react-turnstile": "^1.5.3",
+    "@serwist/build": "^9.5.11",
+    "@serwist/next": "^9.5.11",
+    "autoprefixer": "^10.5.2",
     "axios": "^1.18.1",
+    "framer-motion": "^12.42.2",
+    "libphonenumber-js": "^1.13.8",
+    "lucide-react": "^1.23.0",
     "next": "16.2.10",
+    "next-auth": "^4.24.14",
+    "postcss": "^8.5.16",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "react-hook-form": "^7.81.0",
+    "react-phone-number-input": "^3.4.17",
+    "tailwindcss": "^4.3.2",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
