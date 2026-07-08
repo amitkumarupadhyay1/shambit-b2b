@@ -45,7 +45,7 @@ function CheckoutContent() {
         }
       };
 
-      const response = await api.post('/v1/b2b/checkout/', payload);
+      const response = await api.post('/b2b/checkout/', payload);
       
       if (response.data.status === 'success') {
         setSuccess(`Booking confirmed! Ledger has been debited. Booking ID: ${response.data.booking_id}`);

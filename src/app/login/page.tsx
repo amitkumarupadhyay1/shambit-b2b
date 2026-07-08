@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { signIn } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Loader2, Mail, Lock } from "lucide-react"
+import { Loader2, Mail, Lock, Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
 import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile"
 import AuthPageShell from "@/components/auth/AuthPageShell"
@@ -21,6 +21,7 @@ type LoginFormValues = z.infer<typeof loginSchema>
 function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -85,9 +86,9 @@ function LoginForm() {
 
   return (
     <AuthPageShell
-      eyebrow="Agent Access"
+      eyebrow="B2B Partner Portal"
       title="Welcome back."
-      description="Sign in to your B2B dashboard to manage bookings, ledger balances, and agent reports."
+      description="Sign in to your partner dashboard to manage your agency operations."
     >
       {/* eslint-disable-next-line react-hooks/refs */}
       <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
@@ -134,15 +135,27 @@ function LoginForm() {
             </div>
             <input
               id="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               autoComplete="current-password"
               suppressHydrationWarning
-              className={`block w-full pl-11 pr-4 py-3 border ${
+              className={`block w-full pl-11 pr-12 py-3 border ${
                 errors.password ? "border-red-300 ring-red-300" : "border-slate-200"
               } rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm transition-all bg-white outline-none`}
               placeholder="••••••••"
               {...register("password")}
             />
+            <button
+              type="button"
+              suppressHydrationWarning
+              className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? (
+                <EyeOff className="h-5 w-5" aria-hidden="true" />
+              ) : (
+                <Eye className="h-5 w-5" aria-hidden="true" />
+              )}
+            </button>
           </div>
           {errors.password && (
             <p className="mt-2 text-sm text-red-600 ml-1">
@@ -190,6 +203,7 @@ function LoginForm() {
         <div>
           <button
             type="submit"
+            suppressHydrationWarning
             disabled={loading || turnstileStatus !== 'solved'}
             className="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-orange-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-all disabled:opacity-70 disabled:cursor-not-allowed transform hover:-translate-y-0.5"
           >

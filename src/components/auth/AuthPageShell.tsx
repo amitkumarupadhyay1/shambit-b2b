@@ -1,4 +1,6 @@
 import React from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
 
 interface AuthPageShellProps {
     eyebrow: string;
@@ -8,9 +10,9 @@ interface AuthPageShellProps {
 }
 
 const highlights = [
-    "Secure, encrypted sign-in to protect your ledger data",
-    "Manage your bookings, credit limit, and outstanding balances",
-    "Exclusive B2B rates and dedicated agent support",
+    "Access exclusive wholesale inventory and negotiated B2B rates.",
+    "Manage agency bookings, client itineraries, and credit limits.",
+    "24/7 dedicated partner support and real-time ledger tracking.",
 ];
 
 export default function AuthPageShell({
@@ -21,49 +23,69 @@ export default function AuthPageShell({
 }: AuthPageShellProps) {
     return (
         <main className="min-h-screen flex flex-col bg-white">
-            <header className="py-6 px-8 border-b border-orange-50 bg-white/50 backdrop-blur flex justify-center lg:justify-start">
-              <span className="font-playfair text-2xl font-bold text-slate-900 tracking-tight">
-                ShamBit <span className="text-orange-600">Agents</span>
-              </span>
+            <header className="py-6 px-8 border-b border-orange-50 bg-white/50 backdrop-blur flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Image src="/logo.svg" alt="ShamBit Logo" width={32} height={32} />
+                <span className="font-playfair text-2xl font-bold text-slate-900 tracking-tight">
+                  ShamBit <span className="text-orange-600">Agents</span>
+                </span>
+              </div>
+              <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
+                <Link href="#" className="hover:text-orange-600 transition-colors">Partner Support</Link>
+                <Link href="#" className="hover:text-orange-600 transition-colors">Partner Registration</Link>
+                <Link href="#" className="hover:text-orange-600 transition-colors">Agency Policies</Link>
+              </nav>
             </header>
 
-            <section className="relative flex-1 overflow-hidden bg-[radial-gradient(circle_at_top_left,#fff7ed_0%,#fefce8_45%,#f8fafc_100%)] flex flex-col justify-center">
-                <div className="pointer-events-none absolute -top-24 right-0 h-64 w-64 rounded-full bg-orange-200/40 blur-3xl" />
-                <div className="pointer-events-none absolute bottom-0 left-0 h-56 w-56 rounded-full bg-amber-200/30 blur-3xl" />
+            <section className="relative flex-1 overflow-hidden bg-slate-50 flex flex-col justify-center">
+                <div className="absolute inset-0 z-0">
+                    <div className="absolute -top-40 -right-40 h-96 w-96 rounded-full bg-orange-400/20 blur-[100px]" />
+                    <div className="absolute top-1/2 left-1/4 h-64 w-64 rounded-full bg-amber-400/20 blur-[80px]" />
+                    <div className="absolute -bottom-20 -left-20 h-80 w-80 rounded-full bg-orange-500/10 blur-[90px]" />
+                    <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] mix-blend-overlay" />
+                </div>
 
-                <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_1.05fr] lg:gap-10 lg:px-8 lg:py-12">
-                    <aside className="hidden lg:flex flex-col justify-between rounded-[28px] border border-orange-100 bg-white/70 p-8 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.45)] backdrop-blur-md">
+                <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_1.1fr] lg:gap-12 lg:px-8 lg:py-12 relative z-10">
+                    <aside className="hidden lg:flex flex-col justify-between rounded-[32px] border border-white/40 bg-white/40 p-10 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] backdrop-blur-xl">
                         <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-700">{eyebrow}</p>
-                            <h1 className="mt-4 font-playfair text-4xl leading-tight text-slate-900">{title}</h1>
-                            <p className="mt-4 text-base leading-relaxed text-slate-600">{description}</p>
+                            <div className="inline-flex items-center rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-orange-700">
+                                {eyebrow}
+                            </div>
+                            <h1 className="mt-6 font-playfair text-5xl leading-[1.1] text-slate-900 tracking-tight">{title}</h1>
+                            <p className="mt-5 text-lg leading-relaxed text-slate-600 font-light">{description}</p>
                         </div>
 
-                        <div className="mt-8 space-y-3">
-                            {highlights.map((item) => (
-                                <div key={item} className="flex items-start gap-3 rounded-xl bg-white/70 px-4 py-3 border border-slate-100">
-                                    <span className="mt-1 h-2 w-2 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 flex-shrink-0" />
-                                    <p className="text-sm text-slate-700">{item}</p>
+                        <div className="mt-10 space-y-4">
+                            {highlights.map((item, i) => (
+                                <div key={i} className="group flex items-start gap-4 rounded-2xl bg-white/60 p-4 border border-white/50 transition-all hover:bg-white/80 hover:shadow-sm">
+                                    <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-amber-500 shadow-sm">
+                                        <div className="h-2 w-2 rounded-full bg-white" />
+                                    </div>
+                                    <p className="text-sm font-medium text-slate-700 leading-snug">{item}</p>
                                 </div>
                             ))}
                         </div>
                     </aside>
 
-                    <div className="flex items-center justify-center relative z-10">
+                    <div className="flex items-center justify-center relative">
                         <div className="w-full max-w-xl">
-                            <div className="mb-4 rounded-2xl border border-orange-100 bg-white/75 p-4 backdrop-blur-md lg:hidden">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-orange-700">{eyebrow}</p>
-                                <h1 className="mt-1 font-playfair text-2xl leading-tight text-slate-900">{title}</h1>
+                            <div className="mb-6 rounded-3xl border border-white/40 bg-white/60 p-6 backdrop-blur-xl shadow-sm lg:hidden">
+                                <div className="inline-flex items-center rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-orange-700">
+                                    {eyebrow}
+                                </div>
+                                <h1 className="mt-4 font-playfair text-3xl leading-tight text-slate-900">{title}</h1>
                                 <p className="mt-2 text-sm text-slate-600">{description}</p>
                             </div>
-                            {children}
+                            <div className="rounded-[32px] border border-white/50 bg-white/70 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl sm:p-10">
+                                {children}
+                            </div>
                         </div>
                     </div>
                 </div>
             </section>
 
             <footer className="py-6 text-center text-sm text-slate-500 bg-white border-t border-slate-100">
-              © {new Date().getFullYear()} ShamBit Travels. All rights reserved.
+              © {new Date().getFullYear()} ShamBit Technologies. All rights reserved.
             </footer>
         </main>
     );

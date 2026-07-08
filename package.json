@@ -27,6 +27,7 @@
     "react-hook-form": "^7.81.0",
     "react-phone-number-input": "^3.4.17",
     "tailwindcss": "^4.3.2",
+    "yet-another-react-lightbox": "^3.32.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -31,7 +31,7 @@ export default function BookingsPage() {
     formData.append('file', file);
 
     try {
-      const response = await api.post('/v1/b2b/upload-document/', formData, {
+      const response = await api.post('/b2b/upload-document/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

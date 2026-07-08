@@ -14,9 +14,10 @@ const authOptions: AuthOptions = {
         if (!credentials?.email || !credentials?.password) return null
 
         try {
-          const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/auth/login/`, {
+          const res = await axios.post(`${process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://web:8000/api'}/auth/login/`, {
             email: credentials.email,
             password: credentials.password,
+            client_type: 'b2b'
           })
 
           const data = res.data
