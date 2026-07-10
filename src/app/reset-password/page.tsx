@@ -8,7 +8,7 @@ import { Loader2, Lock, ArrowLeft, Key } from "lucide-react"
 import Link from "next/link"
 import axios from "axios"
 import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile"
-import AuthPageShell from "@/components/auth/AuthPageShell"
+import AuthPageShell from "../../components/auth/AuthPageShell"
 import { useRouter, useSearchParams } from "next/navigation"
 
 const resetPasswordSchema = z.object({

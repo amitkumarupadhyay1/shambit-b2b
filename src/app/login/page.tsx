@@ -9,7 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Mail, Lock, Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
 import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile"
-import AuthPageShell from "@/components/auth/AuthPageShell"
+import AuthPageShell from '../../components/auth/AuthPageShell'
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),

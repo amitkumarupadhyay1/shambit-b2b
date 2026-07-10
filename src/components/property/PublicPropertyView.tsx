@@ -1,6 +1,6 @@
 import React from 'react';
 import Image from 'next/image';
-import PremiumGallery from '@/components/gallery/PremiumGallery';
+import PremiumGallery from '../gallery/PremiumGallery';
 import { Star, MapPin, CheckCircle2 } from 'lucide-react';
 
 interface PublicHotelData {

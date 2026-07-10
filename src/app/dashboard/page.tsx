@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import api from '@/lib/api';
+import api from '../../lib/api';
 import { useSession } from 'next-auth/react';
 import { Loader2, FileText } from 'lucide-react';
 

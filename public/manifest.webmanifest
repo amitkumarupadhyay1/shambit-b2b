@@ -1,0 +1,23 @@
+{
+  "name": "ShamBit B2B Agent Portal",
+  "short_name": "ShamBit Agent",
+  "description": "Premium portal for ShamBit travel agents to manage bookings and ledgers.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f97316",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

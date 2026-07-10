@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import api from '@/lib/api';
+import api from '../../../lib/api';
 import { Info } from 'lucide-react';
 
 function CheckoutContent() {
@@ -33,16 +33,26 @@ function CheckoutContent() {
         hotel_id: parseInt(hotelId as string),
         check_in: searchParams.get('check_in'),
         check_out: searchParams.get('check_out'),
-        adults: parseInt(searchParams.get('adults') as string),
+        adults: parseInt(searchParams.get('adults') as string) || 2,
+        room_id: parseInt(searchParams.get('room_id') as string) || 1, // Assumes room_id is passed, falls back to 1
+        num_rooms: 1,
         primary_guest_name: primaryGuest,
         contact_email: contactEmail,
         contact_phone: contactPhone,
         special_requests: specialRequests,
-        b2b_metadata: {
-          vip_darshan_required: vipDarshan,
-          local_transport_required: localTransport,
-          preferred_floor: preferredFloor
-        }
+        floor_preference: preferredFloor === "high",
+        kitchen_dining_requested: false,
+        vip_requests: vipDarshan ? [{
+          temple_name: "Local Temple",
+          darshan_date: searchParams.get('check_in'),
+          time_slot: "Morning",
+          needs_guide: false
+        }] : [],
+        transport_requests: localTransport ? [{
+          request_type: "BOTH",
+          vehicle_preference: "Standard",
+          remarks: "Local transport requested"
+        }] : []
       };
 
       const response = await api.post('/b2b/checkout/', payload);

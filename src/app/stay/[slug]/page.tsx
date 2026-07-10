@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import PublicPropertyView from '@/components/property/PublicPropertyView';
+import PublicPropertyView from '../../../components/property/PublicPropertyView';
 
 // Helper to fetch and securely scrub data
 async function getPublicHotelData(slug: string) {
@@ -71,7 +71,6 @@ async function getPublicHotelData(slug: string) {
   }
 }
 
-// Generate SEO Metadata dynamically
 export async function generateMetadata(
   props: { params: Promise<{ slug: string }> }
 ): Promise<Metadata> {
@@ -86,6 +85,39 @@ export async function generateMetadata(
                     || hotel.images?.[0]?.image 
                     || '/placeholder-hotel.jpg';
 
+  // Fetch SEO data from Django backend
+  try {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+    // Using content_type=inventory.hotel for standard hotel models
+    const seoRes = await fetch(`${apiUrl}/seo/data/for_object/?content_type=inventory.hotel&object_id=${hotel.id}`);
+    
+    if (seoRes.ok) {
+      const seoData = await seoRes.json();
+      if (seoData && seoData.title) {
+        return {
+          title: seoData.title,
+          description: seoData.description || hotel.description.substring(0, 160) + '...',
+          keywords: seoData.keywords || '',
+          openGraph: {
+            title: seoData.og_title || seoData.title,
+            description: seoData.og_description || seoData.description || hotel.description.substring(0, 160) + '...',
+            images: [{ url: seoData.og_image || primaryImage }],
+            type: 'website',
+          },
+          twitter: {
+            card: 'summary_large_image',
+            title: seoData.og_title || seoData.title,
+            description: seoData.og_description || seoData.description || hotel.description.substring(0, 160) + '...',
+            images: [seoData.og_image || primaryImage],
+          },
+        };
+      }
+    }
+  } catch (err) {
+    console.error("Failed to fetch SEO data:", err);
+  }
+
+  // Fallback to basic metadata
   return {
     title: `${hotel.name} | ShamBit Collection`,
     description: hotel.description.substring(0, 160) + '...',

@@ -8,8 +8,8 @@ import { Loader2, Mail, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import axios from "axios"
 import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile"
-import AuthPageShell from "@/components/auth/AuthPageShell"
-import PhoneInput from "@/components/common/PhoneInput"
+import AuthPageShell from '../../components/auth/AuthPageShell'
+import PhoneInput from "../../components/common/PhoneInput"
 import { isValidPhoneNumber } from 'libphonenumber-js'
 import { useRouter } from "next/navigation"
 
