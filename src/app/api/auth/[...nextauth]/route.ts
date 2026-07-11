@@ -8,7 +8,8 @@ const authOptions: AuthOptions = {
       name: "Credentials",
       credentials: {
         email: { label: "Email", type: "text" },
-        password: { label: "Password", type: "password" }
+        password: { label: "Password", type: "password" },
+        turnstile_token: { label: "Turnstile token", type: "text" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
@@ -17,6 +18,7 @@ const authOptions: AuthOptions = {
           const res = await axios.post(`${process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://web:8000/api'}/auth/login/`, {
             email: credentials.email,
             password: credentials.password,
+            turnstile_token: credentials.turnstile_token,
             client_type: 'b2b'
           })
 

@@ -136,7 +136,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Menu className="h-5 w-5" />
             </button>
             <h1 className="text-xl font-semibold text-slate-800 font-playfair capitalize tracking-wide drop-shadow-sm">
-              {pathname.split('/').pop()?.replace('-', ' ') || 'Dashboard'}
+              {pathname.endsWith('/search') ? 'Find Premium B2B Inventory' : (pathname.split('/').pop()?.replace('-', ' ') || 'Dashboard')}
             </h1>
           </div>
           

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import api from '../../../lib/api';
-import { Search, Star, Share, MapPin, Calendar, Users, Filter, Plus, Minus, ImageIcon, Wifi, Coffee, Car } from 'lucide-react';
+import { Search, Star, Share, MapPin, Calendar, Users, Filter, Plus, Minus, ImageIcon, Wifi, Coffee, Car, Eye, EyeOff } from 'lucide-react';
 
 interface City {
   id: number;
@@ -33,6 +33,7 @@ export default function SearchPage() {
   // Search parameters
   const [cities, setCities] = useState<City[]>([]);
   const [selectedCityName, setSelectedCityName] = useState('');
+  const [customerView, setCustomerView] = useState(false);
   
   // "Wise" Date Picker Logic
   const [today] = useState(() => new Date().toISOString().split('T')[0]);
@@ -190,9 +191,22 @@ export default function SearchPage() {
         {/* GLOBAL SEARCH HEADER - FLOATING PILL DESIGN */}
         <div className="w-full relative z-20 pb-6 mb-2 mt-6 overflow-visible">
           <div className="max-w-7xl mx-auto px-4 md:px-8 relative z-10">
-            <h1 className="text-2xl md:text-4xl font-black text-slate-800 font-playfair mb-8 tracking-tight drop-shadow-sm text-center">
-              Find Premium B2B Inventory
-            </h1>
+            <div className="flex justify-end items-center mb-4">
+              <button 
+                onClick={() => setCustomerView(!customerView)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full shadow-sm border transition-all ${
+                  customerView 
+                    ? 'bg-slate-900 border-slate-900 text-white' 
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+                title="Customer View hides Net Rates and Commissions"
+              >
+                {customerView ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                <span className="text-xs font-bold uppercase tracking-wider">
+                  {customerView ? 'Customer View: ON' : 'Customer View: OFF'}
+                </span>
+              </button>
+            </div>
             
             <div className="flex flex-col lg:flex-row gap-3 bg-white/95 backdrop-blur-xl p-3 rounded-[2rem] border border-white/40 shadow-[0_20px_40px_rgb(0,0,0,0.2)]">
               {/* Destination */}
@@ -442,24 +456,33 @@ export default function SearchPage() {
                             
                             <div className="mt-auto space-y-4">
                               {hotel.b2b_pricing ? (
-                                <div className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50/50 p-1">
-                                  <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100/50 mb-1">
-                                    <div className="flex justify-between text-[11px] text-slate-400 mb-1 font-bold uppercase tracking-wider">
-                                      <span>Retail</span>
-                                      <span className="line-through">₹{hotel.b2b_pricing.base_price}</span>
-                                    </div>
-                                    <div className="flex justify-between items-end">
-                                      <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Net Rate</span>
-                                      <span className="text-2xl font-black text-slate-900 tracking-tighter">₹{hotel.b2b_pricing.net_rate}</span>
+                                customerView ? (
+                                  <div className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50/50 p-1">
+                                    <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100/50 mb-1 flex justify-between items-end">
+                                      <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Final Price</span>
+                                      <span className="text-2xl font-black text-slate-900 tracking-tighter">₹{hotel.b2b_pricing.base_price}</span>
                                     </div>
                                   </div>
-                                  <div className="bg-green-500/10 rounded-xl p-3 flex justify-between items-center border border-green-500/20">
-                                    <span className="text-green-700 text-[10px] font-bold uppercase tracking-widest flex items-center">
-                                      Commission
-                                    </span>
-                                    <span className="text-green-700 text-lg font-black tracking-tight">₹{hotel.b2b_pricing.tac_amount}</span>
+                                ) : (
+                                  <div className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50/50 p-1">
+                                    <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100/50 mb-1">
+                                      <div className="flex justify-between text-[11px] text-slate-400 mb-1 font-bold uppercase tracking-wider">
+                                        <span>Retail</span>
+                                        <span className="line-through">₹{hotel.b2b_pricing.base_price}</span>
+                                      </div>
+                                      <div className="flex justify-between items-end">
+                                        <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Net Rate</span>
+                                        <span className="text-2xl font-black text-slate-900 tracking-tighter">₹{hotel.b2b_pricing.net_rate}</span>
+                                      </div>
+                                    </div>
+                                    <div className="bg-green-500/10 rounded-xl p-3 flex justify-between items-center border border-green-500/20">
+                                      <span className="text-green-700 text-[10px] font-bold uppercase tracking-widest flex items-center">
+                                        Commission
+                                      </span>
+                                      <span className="text-green-700 text-lg font-black tracking-tight">₹{hotel.b2b_pricing.tac_amount}</span>
+                                    </div>
                                   </div>
-                                </div>
+                                )
                               ) : (
                                 <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 text-center flex flex-col items-center justify-center">
                                   <span className="text-sm text-slate-400 font-bold uppercase tracking-widest">Pricing Unavailable</span>
@@ -515,10 +538,10 @@ export default function SearchPage() {
                       <div className="absolute inset-0 border-2 border-orange-200 rounded-full animate-ping opacity-20"></div>
                       <MapPin className="w-12 h-12 text-orange-500 drop-shadow-md" />
                     </div>
-                    <h3 className="text-3xl font-black text-white font-playfair mb-4 drop-shadow-lg text-center max-w-lg">
+                    <h3 className="text-3xl font-black text-slate-800 font-playfair mb-4 text-center max-w-lg">
                       Discover Your Next Great Booking
                     </h3>
-                    <p className="text-slate-300 max-w-md text-center text-lg drop-shadow-md">
+                    <p className="text-slate-600 max-w-md text-center text-lg">
                       Search above to unlock exclusive B2B inventory, negotiated net rates, and instantly calculate your commissions.
                     </p>
                   </div>
