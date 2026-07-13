@@ -36,8 +36,8 @@ export async function generateMetadata(): Promise<Metadata> {
         };
       }
     }
-  } catch (err) {
-    console.error("Failed to fetch SEO metadata for /support route:", err);
+  } catch {
+    console.warn("SEO metadata fetch skipped for /support (API unavailable at build time)");
   }
 
   return defaultMeta;

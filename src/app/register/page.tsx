@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import { useForm, Controller, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -8,7 +8,7 @@ import { Loader2, User as UserIcon, Mail, Building2, MapPin, MessageSquare, Chec
 import Link from "next/link"
 import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile"
 import { motion, AnimatePresence } from "framer-motion"
-import { State, City } from "country-state-city"
+
 import PhoneInput from '../../components/common/PhoneInput'
 import AuthPageShell from '../../components/auth/AuthPageShell'
 
@@ -56,7 +56,12 @@ export default function RegisterPage() {
   const turnstileRef = useRef<TurnstileInstance>(null)
 
 
-  const states = State.getStatesOfCountry('IN')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [csc, setCsc] = useState<any>(null)
+
+  useEffect(() => {
+    import("country-state-city").then(setCsc)
+  }, [])
 
   const {
     register,
@@ -72,7 +77,15 @@ export default function RegisterPage() {
 
   const selectedStateCode = useWatch({ control, name: "state" })
 
-  const cities = selectedStateCode ? City.getCitiesOfState('IN', selectedStateCode) : []
+  const states: { isoCode: string; name: string }[] = useMemo(
+    () => csc ? csc.State.getStatesOfCountry('IN') : [],
+    [csc]
+  )
+
+  const cities: { name: string }[] = useMemo(
+    () => csc && selectedStateCode ? csc.City.getCitiesOfState('IN', selectedStateCode) : [],
+    [csc, selectedStateCode]
+  )
 
   const nextStep = async () => {
     let fieldsToValidate: (keyof RegisterFormValues)[] = []
