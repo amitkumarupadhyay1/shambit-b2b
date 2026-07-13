@@ -86,9 +86,9 @@ function LoginForm() {
 
   return (
     <AuthPageShell
-      eyebrow="B2B Partner Portal"
+      eyebrow="B2B Agent Portal"
       title="Welcome back."
-      description="Sign in to your partner dashboard to manage your agency operations."
+      description="Sign in to your agent dashboard to manage your operations."
     >
       {/* eslint-disable-next-line react-hooks/refs */}
       <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
@@ -114,7 +114,7 @@ function LoginForm() {
               className={`block w-full pl-11 pr-4 py-3 border ${
                 errors.email ? "border-red-300 ring-red-300" : "border-slate-200"
               } rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm transition-all bg-white outline-none`}
-              placeholder="agent@example.com"
+              placeholder="agent@shambit.com"
               {...register("email")}
             />
           </div>

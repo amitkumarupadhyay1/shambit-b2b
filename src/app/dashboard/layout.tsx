@@ -5,7 +5,10 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { signOut } from 'next-auth/react';
-import { LogOut, Home, Search, Calendar, FileText, Menu, X, User, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LogOut, Home, Search, Calendar, FileText, Menu, X, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
+import { NotificationBell } from '@/components/NotificationBell';
+import { Toaster } from 'react-hot-toast';
+import { useAgentProfile } from '@/hooks/useAgentProfile';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -13,6 +16,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+  
+  const { profile } = useAgentProfile();
 
   // Load sidebar preference
   useEffect(() => {
@@ -122,6 +127,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       <main className="flex-1 flex flex-col w-full h-full relative z-0 transition-all duration-300 bg-transparent">
+        <Toaster position="top-center" />
         <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.05] mix-blend-overlay pointer-events-none" />
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-orange-500/10 rounded-full blur-[120px] pointer-events-none mix-blend-screen" />
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-amber-500/10 rounded-full blur-[120px] pointer-events-none mix-blend-screen" />
@@ -141,29 +147,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           
           <div className="flex items-center relative z-10" ref={profileRef}>
+            <NotificationBell />
             <button 
               onClick={() => setIsProfileOpen(!isProfileOpen)}
               className="flex items-center gap-2 p-1 rounded-full hover:bg-slate-100 transition-all focus:outline-none focus:ring-2 focus:ring-orange-500/50"
             >
               <div className="h-10 w-10 rounded-full bg-gradient-to-br from-orange-500 via-orange-400 to-amber-500 flex items-center justify-center text-white font-bold shadow-lg shadow-orange-500/40 border-2 border-white">
-                A
+                {profile?.first_name?.charAt(0).toUpperCase() || 'A'}
               </div>
             </button>
             
             {isProfileOpen && (
               <div className="absolute right-0 top-14 w-56 bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200 py-2 animate-in fade-in slide-in-from-top-2 z-[110]">
                 <div className="px-4 py-3 border-b border-slate-100 bg-gradient-to-br from-slate-50 to-transparent">
-                  <p className="text-sm font-bold text-slate-800">Agent Profile</p>
-                  <p className="text-xs text-slate-500 truncate mt-0.5">agent@example.com</p>
+                  <p className="text-sm font-bold text-slate-800">
+                    {profile ? `${profile.first_name} ${profile.last_name}` : 'Agent Profile'}
+                  </p>
+                  <p className="text-xs text-slate-500 truncate mt-0.5">
+                    {profile ? profile.email : 'Loading...'}
+                  </p>
                 </div>
                 <div className="py-1">
-                  <Link href="/dashboard/profile" className="flex items-center px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
-                    <User className="mr-3 h-4 w-4 text-slate-400" />
-                    My Profile
-                  </Link>
-                  <Link href="/dashboard/settings" className="flex items-center px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                  <Link href="/dashboard/profile" onClick={() => setIsProfileOpen(false)} className="flex items-center px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
                     <Settings className="mr-3 h-4 w-4 text-slate-400" />
-                    Settings
+                    Profile & Settings
                   </Link>
                 </div>
                 <div className="py-1 border-t border-slate-100">

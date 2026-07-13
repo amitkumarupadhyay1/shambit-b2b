@@ -116,7 +116,7 @@ export default function PublicPropertyView({ hotel }: PublicPropertyViewProps) {
             <div className="sticky top-24 bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
               <h3 className="text-2xl font-playfair font-bold text-slate-900 mb-2">Ready to stay?</h3>
               <p className="text-slate-500 mb-8">
-                Contact your ShamBit travel agent to unlock exclusive partner rates, confirm availability, and finalize your booking.
+                Contact your ShamBit travel agent to unlock exclusive agent rates, confirm availability, and finalize your booking.
               </p>
               <button 
                 onClick={() => window.location.href = "mailto:contact@shambit.com"}

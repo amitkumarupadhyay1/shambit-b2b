@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect, useMemo } from 'react'
-import { getCountries, getCountryCallingCode } from 'react-phone-number-input/input'
+import { getCountries, getCountryCallingCode } from 'react-phone-number-input'
 import type { Country } from 'react-phone-number-input'
 import PhoneInputWithInput from 'react-phone-number-input/input'
 import { ChevronDown, Search } from 'lucide-react'
@@ -61,7 +61,7 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     <div className={cn("flex flex-col gap-1 w-full", className)}>
       <div className="flex items-start gap-2 relative">
         <div className="relative" ref={dropdownRef}>
-          <button
+          <button suppressHydrationWarning
             type="button"
             disabled={disabled}
             onClick={() => setIsOpen(!isOpen)}
@@ -85,7 +85,7 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
             <div className="absolute z-50 top-full left-0 mt-1 w-[300px] bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden">
               <div className="p-2 border-b border-slate-100 flex items-center gap-2">
                 <Search className="w-4 h-4 text-slate-400" />
-                <input
+                <input suppressHydrationWarning
                   type="text"
                   autoFocus
                   placeholder="Search country or code..."
@@ -97,7 +97,7 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
               <div className="max-h-[250px] overflow-y-auto">
                 {filteredCountries.length > 0 ? (
                   filteredCountries.map((c) => (
-                    <button
+                    <button suppressHydrationWarning
                       key={c}
                       type="button"
                       className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 text-left transition-colors"

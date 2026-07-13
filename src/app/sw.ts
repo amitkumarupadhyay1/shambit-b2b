@@ -41,19 +41,23 @@ serwist.addEventListeners();
 
 // Listen to push events
 self.addEventListener('push', (event: any) => {
-  let data;
+  let payload: any = {};
   try {
-    const parsed = event.data?.json();
-    data = parsed ?? {};
+    payload = event.data?.json() ?? {};
   } catch {
-    data = { body: event.data?.text() ?? 'You have a new notification.' };
+    payload = { body: event.data?.text() ?? 'You have a new notification.' };
   }
-  const title = data?.title || 'ShamBit Travels';
+
+  const title = payload.title || 'ShamBit Travels';
+  // Extract URL from payload.data.url or payload.url
+  const targetUrl = payload.data?.url || payload.url || '/';
+
   const options = {
-    body: data?.body || 'You have a new notification.',
-    icon: '/logo-192.png',
-    badge: '/maskable_icon_x96.png',
-    data: data?.url || '/',
+    body: payload.body || 'You have a new notification.',
+    icon: payload.icon || '/logo-192.png',
+    badge: payload.badge || '/maskable_icon_x96.png',
+    tag: payload.tag || 'notification',
+    data: { url: targetUrl, ...payload.data },
   };
 
   event.waitUntil(
@@ -64,7 +68,7 @@ self.addEventListener('push', (event: any) => {
 // Handle notification click
 self.addEventListener('notificationclick', (event: any) => {
   event.notification.close();
-  const targetPath = event.notification.data || '/';
+  const targetPath = event.notification.data?.url || '/';
   const urlToOpen = new URL(targetPath, self.location.origin).href;
   
   event.waitUntil(

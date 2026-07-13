@@ -186,7 +186,7 @@ export default function ForgotPasswordPage() {
                     className={`block w-full pl-11 pr-4 py-3 border ${
                       errors.email ? "border-red-300 ring-red-300" : "border-slate-200"
                     } rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm transition-all bg-white outline-none`}
-                    placeholder="agent@example.com"
+                    placeholder="agent@shambit.com"
                     {...register("email")}
                   />
                 </div>

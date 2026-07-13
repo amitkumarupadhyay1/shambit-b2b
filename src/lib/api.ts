@@ -8,13 +8,23 @@ const api = axios.create({
   },
 });
 
+// Cache session to avoid redundant network calls on every API request
+let cachedSession: { accessToken?: string } | null = null;
+let sessionFetchTime = 0;
+
 // Interceptor to attach token
 api.interceptors.request.use(async (config) => {
   if (typeof window !== 'undefined') {
     try {
-      const session = await getSession();
-      if (session?.accessToken) {
-        config.headers.Authorization = `Bearer ${session.accessToken}`;
+      const now = Date.now();
+      // Cache the session for 60 seconds
+      if (!cachedSession || now - sessionFetchTime > 60000) {
+        cachedSession = await getSession();
+        sessionFetchTime = now;
+      }
+
+      if (cachedSession?.accessToken) {
+        config.headers.Authorization = `Bearer ${cachedSession.accessToken}`;
       }
     } catch (e) {
       console.error('Failed to get session token', e);
