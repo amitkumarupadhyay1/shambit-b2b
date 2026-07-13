@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import api from '../../lib/api';
 import { useSession } from 'next-auth/react';
-import { Loader2, FileText } from 'lucide-react';
+import { FileText } from 'lucide-react';
+import useSWR from 'swr';
 
 interface DashboardData {
   agent_id: number;
@@ -20,45 +19,52 @@ interface DashboardData {
   }>;
 }
 
+function DashboardSkeleton() {
+  return (
+    <div className="pb-12 animate-in fade-in duration-500">
+      <div className="mb-8">
+        <div className="h-8 bg-slate-200 rounded-lg w-1/3 mb-4 animate-pulse"></div>
+        <div className="h-4 bg-slate-200 rounded w-1/4 animate-pulse"></div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-white/70 backdrop-blur-xl p-6 rounded-[24px] border border-white/60 shadow-sm h-32 animate-pulse"></div>
+        ))}
+      </div>
+      <div className="bg-white/70 backdrop-blur-xl rounded-[24px] border border-white/60 shadow-sm h-64 animate-pulse"></div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { status } = useSession();
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  
+  // SWR automatically handles loading and error states globally via Providers
+  const { data, error, isLoading } = useSWR<DashboardData>(
+    status === 'authenticated' ? '/agent/dashboard/summary/' : null
+  );
 
-  useEffect(() => {
-    if (status === 'authenticated') {
-      const fetchDashboard = async () => {
-        try {
-          const response = await api.get('/agent/dashboard/summary/');
-          setData(response.data);
-        } catch {
-          setError('Failed to load dashboard data. Please try logging in again.');
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchDashboard();
-    }
-  }, [status]);
-
-  if (loading || status === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
-      </div>
-    );
+  if (isLoading || status === 'loading') {
+    return <DashboardSkeleton />;
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-red-500 bg-red-50 p-4 rounded-xl border border-red-100">{error}</div>
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="text-red-500 bg-red-50 p-6 rounded-2xl border border-red-100 shadow-sm">
+          Failed to load dashboard data. Please try logging in again.
+        </div>
       </div>
     );
   }
 
-  if (!data) return null;
+  if (!data) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-600">
+        Dashboard data is not available yet. Please refresh the page.
+      </div>
+    );
+  }
 
   return (
     <div className="pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">

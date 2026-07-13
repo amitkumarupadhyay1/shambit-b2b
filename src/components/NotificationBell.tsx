@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Bell } from 'lucide-react';
 import api from '@/lib/api';
 import Link from 'next/link';
+import useSWR from 'swr';
+import toast from 'react-hot-toast';
 
 interface Notification {
   id: number;
@@ -16,45 +18,50 @@ interface Notification {
 
 export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // useSWR automatically handles caching, revalidation, and deduplication
+  const { data: notifications = [], mutate } = useSWR<Notification[]>('/notifications/', {
+    refreshInterval: 60000, // Poll every minute only when window is focused
+  });
+
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
+
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
+    function handleInteraction(event: MouseEvent | KeyboardEvent) {
+      if (event.type === 'mousedown') {
+        if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+          setIsOpen(false);
+        }
+      } else if (event.type === 'keydown') {
+        if ((event as KeyboardEvent).key === 'Escape') {
+          setIsOpen(false);
+        }
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const fetchNotifications = async () => {
-    try {
-      const response = await api.get('/notifications/');
-      setNotifications(response.data.results || response.data || []);
-      const unread = (response.data.results || response.data || []).filter((n: Notification) => !n.is_read).length;
-      setUnreadCount(unread);
-    } catch (error) {
-      console.error('Failed to fetch notifications', error);
-    }
-  };
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60000); // Polling every minute
-    return () => clearInterval(interval);
+    document.addEventListener('mousedown', handleInteraction);
+    document.addEventListener('keydown', handleInteraction);
+    return () => {
+      document.removeEventListener('mousedown', handleInteraction);
+      document.removeEventListener('keydown', handleInteraction);
+    };
   }, []);
 
   const markAsRead = async (id: number) => {
+    // Optimistic update
+    const previousNotifications = [...notifications];
+    mutate(
+      notifications.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
+      false
+    );
+
     try {
       await api.post(`/notifications/${id}/read/`);
-      setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: true } : n));
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      mutate(); // Revalidate from server
     } catch (error) {
       console.error('Failed to mark notification as read', error);
+      toast.error("Failed to mark as read");
+      mutate(previousNotifications, false); // Rollback
     }
   };
 
@@ -62,6 +69,9 @@ export function NotificationBell() {
     <div className="relative mr-4" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
+        aria-expanded={isOpen}
+        aria-haspopup="true"
+        aria-label="Notifications"
         className="relative p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50"
       >
         <Bell className="h-5 w-5" />
@@ -81,7 +91,7 @@ export function NotificationBell() {
                 onClick={async () => {
                   try {
                     await api.post('/notifications/read-all/');
-                    fetchNotifications();
+                    mutate();
                   } catch (e) {
                     console.error(e);
                   }

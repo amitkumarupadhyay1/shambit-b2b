@@ -4,17 +4,19 @@ import PublicPropertyView from '../../../components/property/PublicPropertyView'
 
 // Helper to fetch and securely scrub data
 async function getPublicHotelData(slug: string) {
-  // Extract ID from the slug (e.g., "142-ayodhya-grand" -> "142")
-  const idStr = slug.split('-')[0];
-  const hotelId = parseInt(idStr, 10);
+  // Extract ID from the slug using regex (e.g., "142-ayodhya-grand" -> "142" or just "142")
+  const match = slug.match(/^(\d+)(?:-|$)/);
+  if (!match) return null;
   
+  const hotelId = parseInt(match[1], 10);
   if (isNaN(hotelId)) return null;
 
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiUrl) throw new Error("NEXT_PUBLIC_API_URL environment variable is not set");
     
     // Attempt to fetch from the explicit endpoint if it exists
-    let response = await fetch(`${apiUrl}/hotels/${hotelId}/`, {
+    const response = await fetch(`${apiUrl}/hotels/${hotelId}/`, {
       next: { revalidate: 3600 } // Cache for 1 hour for fast public serving
     });
 
@@ -23,18 +25,9 @@ async function getPublicHotelData(slug: string) {
     if (response.ok) {
       data = await response.json();
     } else {
-      // Fallback: If explicit endpoint doesn't exist, use the search API
-      // In production, the backend team should create a dedicated public endpoint
-      response = await fetch(`${apiUrl}/b2b/search/?q=${slug}`, {
-        next: { revalidate: 3600 }
-      });
-      if (!response.ok) return null;
-      
-      const searchData = await response.json();
-      const results = searchData.results || searchData || [];
-      data = results.find((h: { id: number }) => h.id === hotelId);
-      
-      if (!data) return null;
+      // If the explicit endpoint doesn't exist, we do not fallback to search.
+      // This prevents inefficient N+1 fetching or full-table scans.
+      return null;
     }
 
     // ==========================================
@@ -85,9 +78,9 @@ export async function generateMetadata(
                     || hotel.images?.[0]?.image 
                     || '/placeholder-hotel.jpg';
 
-  // Fetch SEO data from Django backend
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiUrl) throw new Error("NEXT_PUBLIC_API_URL environment variable is not set");
     // Using content_type=inventory.hotel for standard hotel models
     const seoRes = await fetch(`${apiUrl}/seo/data/for_object/?content_type=inventory.hotel&object_id=${hotel.id}`);
     

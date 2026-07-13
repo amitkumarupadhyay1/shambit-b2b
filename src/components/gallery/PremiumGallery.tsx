@@ -2,13 +2,15 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import Lightbox from 'yet-another-react-lightbox';
-import Zoom from 'yet-another-react-lightbox/plugins/zoom';
-import Thumbnails from 'yet-another-react-lightbox/plugins/thumbnails';
-import Fullscreen from 'yet-another-react-lightbox/plugins/fullscreen';
+import dynamic from 'next/dynamic';
 import 'yet-another-react-lightbox/styles.css';
 import 'yet-another-react-lightbox/plugins/thumbnails.css';
 import { Grid, Image as ImageIcon } from 'lucide-react';
+import Zoom from 'yet-another-react-lightbox/plugins/zoom';
+import Thumbnails from 'yet-another-react-lightbox/plugins/thumbnails';
+import Fullscreen from 'yet-another-react-lightbox/plugins/fullscreen';
+
+const Lightbox = dynamic(() => import('yet-another-react-lightbox'), { ssr: false });
 
 interface PremiumGalleryProps {
   images: Array<{ id: number; image: string; is_primary: boolean }>;
@@ -117,27 +119,29 @@ export default function PremiumGallery({ images, hotelName }: PremiumGalleryProp
       </div>
 
       {/* Premium Lightbox Modal */}
-      <Lightbox
-        open={open}
-        close={() => setOpen(false)}
-        index={index}
-        slides={slides}
-        plugins={[Zoom, Thumbnails, Fullscreen]}
-        zoom={{
-          maxZoomPixelRatio: 3,
-          zoomInMultiplier: 2,
-          doubleTapDelay: 300,
-          doubleClickDelay: 300,
-          doubleClickMaxStops: 2,
-          keyboardMoveDistance: 50,
-          wheelZoomDistanceFactor: 100,
-          pinchZoomDistanceFactor: 100,
-          scrollToZoom: true,
-        }}
-        styles={{
-          container: { backgroundColor: 'rgba(0, 0, 0, 0.95)' },
-        }}
-      />
+      {open && (
+        <Lightbox
+          open={open}
+          close={() => setOpen(false)}
+          index={index}
+          slides={slides}
+          plugins={[Zoom, Thumbnails, Fullscreen]}
+          zoom={{
+            maxZoomPixelRatio: 3,
+            zoomInMultiplier: 2,
+            doubleTapDelay: 300,
+            doubleClickDelay: 300,
+            doubleClickMaxStops: 2,
+            keyboardMoveDistance: 50,
+            wheelZoomDistanceFactor: 100,
+            pinchZoomDistanceFactor: 100,
+            scrollToZoom: true,
+          }}
+          styles={{
+            container: { backgroundColor: 'rgba(0, 0, 0, 0.95)' },
+          }}
+        />
+      )}
     </>
   );
 }

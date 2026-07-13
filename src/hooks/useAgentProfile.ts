@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import useSWR from 'swr';
 import api from '../lib/api';
 import toast from 'react-hot-toast';
+import axios from 'axios';
+import { useState } from 'react';
 
 export interface AgentProfileData {
   id: number;
@@ -32,55 +34,45 @@ export interface AgentProfileData {
 }
 
 export function useAgentProfile() {
-  const [profile, setProfile] = useState<AgentProfileData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: profile, error: swrError, mutate, isLoading } = useSWR<AgentProfileData>('/agent/dashboard/summary/');
   const [updating, setUpdating] = useState(false);
 
-  const fetchProfile = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      // We use the summary endpoint which returns the profile + recent_transactions
-      const response = await api.get('/agent/dashboard/summary/');
-      setProfile(response.data);
-    } catch (err: unknown) {
-      console.error('Error fetching agent profile:', err);
-      const e = err as { response?: { data?: { error?: string } } };
-      setError(e.response?.data?.error || 'Failed to load profile');
-    } finally {
-      setLoading(false);
+  // Parse error safely
+  let errorMsg: string | null = null;
+  if (swrError) {
+    if (axios.isAxiosError(swrError)) {
+      errorMsg = swrError.response?.data?.error || 'Failed to load profile';
+    } else {
+      errorMsg = (swrError as Error).message || 'Failed to load profile';
     }
-  };
+  }
 
   const updateProfile = async (data: Partial<AgentProfileData>) => {
     try {
       setUpdating(true);
       const response = await api.patch('/agent/dashboard/update_profile/', data);
-      setProfile((prev) => (prev ? { ...prev, ...response.data } : response.data));
+      mutate({ ...profile, ...response.data }, false); // Optimistic update
       toast.success('Profile updated successfully');
       return true;
     } catch (err: unknown) {
       console.error('Error updating agent profile:', err);
-      const e = err as { response?: { data?: { error?: string } } };
-      toast.error(e.response?.data?.error || 'Failed to update profile');
+      if (axios.isAxiosError(err)) {
+        toast.error(err.response?.data?.error || 'Failed to update profile');
+      } else {
+        toast.error('An unexpected error occurred while updating the profile');
+      }
       return false;
     } finally {
       setUpdating(false);
     }
   };
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchProfile();
-  }, []);
-
   return {
-    profile,
-    loading,
-    error,
+    profile: profile || null,
+    loading: isLoading,
+    error: errorMsg,
     updating,
     updateProfile,
-    refreshProfile: fetchProfile,
+    refreshProfile: () => mutate(),
   };
 }

@@ -80,7 +80,7 @@ export default function ProfileSettingsPage() {
 
     setPasswordLoading(true);
     try {
-      await api.post('/users/change-password/', {
+      await api.post('/auth/change-password/', {
         current_password: currentPassword,
         new_password: newPassword,
       });
@@ -318,7 +318,6 @@ export default function ProfileSettingsPage() {
             <button 
               onClick={() => {
                 setEditingBank(true);
-                setFormData({...formData, bank_account_number: ''}); // clear for fresh entry
               }}
               className="text-sm font-medium text-emerald-700 hover:text-emerald-800 bg-emerald-50 px-4 py-2 rounded-lg transition-colors"
             >
@@ -366,11 +365,22 @@ export default function ProfileSettingsPage() {
               <div className="pt-4 flex justify-end space-x-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    setEditingBank(false);
-                    // restore from profile
-                    setFormData({...formData, bank_account_number: profile?.bank_account_number ? '••••••••' + profile.bank_account_number.slice(-4) : ''});
-                  }}
+                    onClick={() => {
+                      setEditingBank(false);
+                      if (profile) {
+                        setFormData({
+                          first_name: profile.first_name || '',
+                          last_name: profile.last_name || '',
+                          phone: profile.phone || '',
+                          agency_name: profile.agency_name || '',
+                          agency_website: profile.agency_website || '',
+                          year_established: profile.year_established?.toString() || '',
+                          bank_account_name: profile.bank_account_name || '',
+                          bank_account_number: profile.bank_account_number ? '••••••••' + profile.bank_account_number.slice(-4) : '',
+                          bank_ifsc_code: profile.bank_ifsc_code || '',
+                        });
+                      }
+                    }}
                   className="px-6 py-3 rounded-xl border border-slate-200 text-slate-600 font-medium text-sm hover:bg-slate-50 transition-all"
                 >
                   Cancel

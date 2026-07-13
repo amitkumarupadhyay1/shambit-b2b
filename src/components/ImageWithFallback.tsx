@@ -17,8 +17,7 @@ export function ImageWithFallback({
   const [imgSrc, setImgSrc] = useState(src);
   const [hasError, setHasError] = useState(false);
   const [prevSrc, setPrevSrc] = useState(src);
-
-  if (src !== prevSrc) {
+  if (prevSrc !== src) {
     setPrevSrc(src);
     setImgSrc(src);
     setHasError(false);

@@ -23,6 +23,18 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/sitemap.xml',
+        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/seo/sitemap.xml/`,
+      },
+      {
+        source: '/robots.txt',
+        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/seo/robots.txt/`,
+      },
+    ];
+  },
 };
 
 const withSerwist = withSerwistInit({

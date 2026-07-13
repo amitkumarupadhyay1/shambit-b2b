@@ -20,7 +20,7 @@ const AMENITIES = [
   { id: 'parking', icon: Car, label: 'Parking' }
 ];
 
-const MAX_SLIDER_PRICE = 50000;
+const MAX_SLIDER_PRICE = 500000;
 
 function SearchContent() {
   const router = useRouter();
@@ -169,8 +169,23 @@ function SearchContent() {
       toast.error("Please select check-in and check-out dates before booking.");
       return;
     }
-    const roomId = hotel.rooms && hotel.rooms.length > 0 ? hotel.rooms[0].id : 1;
-    router.push(`/dashboard/checkout?hotel_id=${hotel.id}&room_id=${roomId}&check_in=${checkIn}&check_out=${checkOut}&adults=${adults}`);
+    const roomId = hotel.rooms?.[0]?.id;
+    if (!roomId || !hotel.b2b_pricing) {
+      toast.error('This hotel does not have a live B2B rate available. Please search again.');
+      return;
+    }
+
+    const params = new URLSearchParams({
+      hotel_id: String(hotel.id),
+      room_id: String(roomId),
+      check_in: checkIn,
+      check_out: checkOut,
+      adults: String(adults),
+      base_price: hotel.b2b_pricing.base_price,
+      net_rate: hotel.b2b_pricing.net_rate,
+      tac_amount: hotel.b2b_pricing.tac_amount,
+    });
+    router.push(`/dashboard/checkout?${params.toString()}`);
   };
 
   return (

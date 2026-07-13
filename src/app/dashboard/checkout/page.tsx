@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense, useEffect } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '../../../lib/api';
 import { Info, ChevronDown, ChevronUp } from 'lucide-react';
@@ -9,6 +9,7 @@ function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const hotelId = searchParams.get('hotel_id');
+  const roomId = searchParams.get('room_id');
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -23,53 +24,41 @@ function CheckoutContent() {
   const [localTransport, setLocalTransport] = useState(false);
   const [preferredFloor, setPreferredFloor] = useState('any');
   
-  const [pricing, setPricing] = useState<{base_price: string, net_rate: string, tac_amount: string} | null>(null);
-  const [agentMarkup, setAgentMarkup] = useState<number>(0);
+  const basePrice = searchParams.get('base_price');
+  const netRate = searchParams.get('net_rate');
+  const tacAmount = searchParams.get('tac_amount');
+  const hasLivePricing = [basePrice, netRate, tacAmount].every((value) => {
+    const parsed = Number(value);
+    return value !== null && Number.isFinite(parsed) && parsed >= 0;
+  });
+  const pricing = hasLivePricing && basePrice && netRate && tacAmount
+    ? { base_price: basePrice, net_rate: netRate, tac_amount: tacAmount }
+    : null;
   const [showLedgerDetails, setShowLedgerDetails] = useState(false);
-
-  useEffect(() => {
-    if (hotelId) {
-      // Try to fetch specific room pricing from search or dedicated endpoint
-      api.get('/b2b/search/', {
-        params: {
-          hotel_id: hotelId,
-          check_in: searchParams.get('check_in'),
-          check_out: searchParams.get('check_out'),
-          adults: searchParams.get('adults')
-        }
-      })
-      .then(res => {
-        const hits = res.data.results?.hotels || res.data.results || res.data || [];
-        const hotel = hits.find((h: { id: string | number; b2b_pricing?: Record<string, string> }) => h.id.toString() === hotelId);
-        if (hotel && hotel.b2b_pricing) {
-          setPricing(hotel.b2b_pricing);
-        } else {
-          throw new Error("No pricing found");
-        }
-      })
-      .catch(() => {
-        // Fallback robust logic if no API available
-        setPricing({
-          base_price: '6000.00',
-          net_rate: '4800.00',
-          tac_amount: '1200.00'
-        });
-      });
-    }
-  }, [hotelId, searchParams]);
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
+    const parsedHotelId = Number(hotelId);
+    const parsedRoomId = Number(roomId);
+    const parsedAdults = Number(searchParams.get('adults'));
+    const checkIn = searchParams.get('check_in');
+    const checkOut = searchParams.get('check_out');
+    if (!Number.isInteger(parsedHotelId) || parsedHotelId < 1 || !Number.isInteger(parsedRoomId) || parsedRoomId < 1 || !Number.isInteger(parsedAdults) || parsedAdults < 1 || !checkIn || !checkOut) {
+      setError('Your booking details are incomplete or invalid. Return to search and select the hotel again.');
+      setLoading(false);
+      return;
+    }
     
     try {
       const payload = {
-        hotel_id: parseInt(hotelId as string),
-        check_in: searchParams.get('check_in'),
-        check_out: searchParams.get('check_out'),
-        adults: parseInt(searchParams.get('adults') as string) || 2,
-        room_id: parseInt(searchParams.get('room_id') as string) || 1, // Assumes room_id is passed, falls back to 1
+        hotel_id: parsedHotelId,
+        check_in: checkIn,
+        check_out: checkOut,
+        adults: parsedAdults,
+        room_id: parsedRoomId,
         num_rooms: 1,
         primary_guest_name: primaryGuest,
         contact_email: contactEmail,
@@ -87,14 +76,13 @@ function CheckoutContent() {
           request_type: "BOTH",
           vehicle_preference: "Standard",
           remarks: "Local transport requested"
-        }] : [],
-        agent_markup: agentMarkup
+        }] : []
       };
 
       const response = await api.post('/b2b/checkout/', payload);
       
       if (response.data.status === 'success') {
-        setSuccess(`Booking confirmed! Ledger has been debited. Booking ID: ${response.data.booking_id}`);
+        setSuccess(`Booking confirmed. Reference: ${response.data.booking_reference}`);
         setTimeout(() => {
           router.push('/dashboard/bookings');
         }, 3000);
@@ -119,6 +107,7 @@ function CheckoutContent() {
       
       {success && <div className="p-4 rounded-xl bg-green-50 text-green-700 border border-green-100">{success}</div>}
       {error && <div className="p-4 rounded-xl bg-red-50 text-red-700 border border-red-100">{error}</div>}
+      {!pricing && <div className="p-4 rounded-xl bg-amber-50 text-amber-800 border border-amber-200">Live B2B pricing is unavailable. Return to search and select a hotel with an available rate before booking.</div>}
       
       <div className="flex flex-col lg:flex-row gap-6">
         <div className="flex-1">
@@ -218,7 +207,7 @@ function CheckoutContent() {
               <button 
                 type="submit" 
                 className="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-orange-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-all disabled:opacity-70 disabled:cursor-not-allowed transform hover:-translate-y-0.5" 
-                disabled={loading || !!success}
+                disabled={loading || !!success || !pricing}
               >
                 {loading ? 'Processing...' : 'Confirm Booking via Ledger'}
               </button>
@@ -252,22 +241,10 @@ function CheckoutContent() {
                     <span className="text-slate-800 font-bold line-through">₹{pricing.base_price}</span>
                   </div>
                   
-                  <div className="flex justify-between items-center text-sm mb-4 bg-orange-50 p-2 rounded-lg border border-orange-100">
-                    <span className="text-orange-800 font-bold">Agent Markup (₹)</span>
-                    <input 
-                      type="number" 
-                      min="0"
-                      className="w-24 px-2 py-1 border border-orange-200 rounded focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white text-right font-bold text-orange-900"
-                      value={agentMarkup || ''}
-                      onChange={(e) => setAgentMarkup(parseFloat(e.target.value) || 0)}
-                      placeholder="0"
-                    />
-                  </div>
-
                   <div className="flex justify-between items-center text-lg mb-4">
-                    <span className="text-slate-800 font-black">Final Selling Price</span>
+                    <span className="text-slate-800 font-black">Amount to Debit</span>
                     <span className="text-slate-900 font-black">
-                      ₹{(parseFloat(pricing.base_price) + agentMarkup).toFixed(2)}
+                      ₹{Number(pricing.net_rate).toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -294,14 +271,10 @@ function CheckoutContent() {
                         <span className="text-green-600 font-medium">Your Commission</span>
                         <span className="text-green-700 font-bold">₹{pricing.tac_amount}</span>
                       </div>
-                      <div className="flex justify-between items-end text-sm">
-                        <span className="text-orange-600 font-medium">Agent Markup</span>
-                        <span className="text-orange-700 font-bold">₹{agentMarkup.toFixed(2)}</span>
-                      </div>
                       <div className="pt-2 mt-2 border-t border-slate-100 flex justify-between items-end">
                         <span className="text-slate-800 font-bold text-sm">Total Profit</span>
                         <span className="text-green-600 font-black text-lg">
-                          ₹{(parseFloat(pricing.tac_amount) + agentMarkup).toFixed(2)}
+                          ₹{Number(pricing.tac_amount).toFixed(2)}
                         </span>
                       </div>
                       <div className="pt-2 mt-2 border-t border-slate-100 flex justify-between items-end bg-red-50 p-2 rounded-lg mt-4">

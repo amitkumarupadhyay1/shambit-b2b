@@ -14,7 +14,7 @@ export interface HotelResult {
   star_rating: number;
   image_url_first?: string; 
   images?: string[];
-  rooms?: Array<{ id: number; [key: string]: unknown }>;
+  rooms?: Array<{ id?: number; name?: string; description?: string }>;
   b2b_pricing?: {
     base_price: string;
     net_rate: string;

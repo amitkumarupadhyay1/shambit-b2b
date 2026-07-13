@@ -10,7 +10,7 @@ interface PublicHotelData {
   description: string;
   star_rating: number;
   images: Array<{ id: number; image: string; is_primary: boolean }>;
-  rooms: Array<{ name?: string; description?: string; [key: string]: unknown }>;
+  rooms: Array<{ id?: number; name?: string; description?: string }>;
 }
 
 interface PublicPropertyViewProps {
@@ -84,7 +84,7 @@ export default function PublicPropertyView({ hotel }: PublicPropertyViewProps) {
               <div className="space-y-6">
                 {hotel.rooms?.length > 0 ? (
                   hotel.rooms.map((room, idx) => (
-                    <div key={idx} className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col sm:flex-row gap-6 hover:shadow-md transition-shadow">
+                    <div key={room.id || `room-${idx}`} className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col sm:flex-row gap-6 hover:shadow-md transition-shadow">
                       <div className="flex-1">
                         <h3 className="text-xl font-bold text-slate-900 mb-2">{room.name || `Premium Room ${idx + 1}`}</h3>
                         <p className="text-slate-500 text-sm mb-4 line-clamp-3">
