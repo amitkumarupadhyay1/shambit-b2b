@@ -4,6 +4,7 @@ import { memo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Star, MapPin, Share } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useSession } from 'next-auth/react';
 import { ImageWithFallback } from './ImageWithFallback';
 
 export interface HotelResult {
@@ -12,8 +13,11 @@ export interface HotelResult {
   address: string;
   description: string;
   star_rating: number;
+  slug?: string;
   image_url_first?: string; 
-  images?: string[];
+  images?: Array<string | { is_primary?: boolean; file_url?: string; image?: string }>;
+  media?: Array<{ is_primary?: boolean; file_url?: string; image?: string }>;
+  image_urls?: string[];
   rooms?: Array<{ id?: number; name?: string; description?: string }>;
   b2b_pricing?: {
     base_price: string;
@@ -40,11 +44,33 @@ export const HotelCard = memo(function HotelCard({
   hotel: HotelResult, 
   onBook: (h: HotelResult) => void 
 }) {
-  const primaryImage = hotel.image_url_first || (hotel.images && hotel.images[0]) || '';
+  const primaryImage = hotel.image_url_first 
+    || hotel.image_urls?.[0]
+    || hotel.media?.find(m => m.is_primary)?.file_url 
+    || hotel.media?.find(m => m.is_primary)?.image 
+    || hotel.media?.[0]?.file_url 
+    || hotel.media?.[0]?.image
+    || hotel.images?.find((m): m is { is_primary?: boolean; file_url?: string; image?: string } => typeof m !== 'string' && !!m.is_primary)?.file_url
+    || hotel.images?.find((m): m is { is_primary?: boolean; file_url?: string; image?: string } => typeof m !== 'string' && !!m.is_primary)?.image
+    || (typeof hotel.images?.[0] !== 'string' ? hotel.images?.[0]?.file_url : undefined)
+    || (typeof hotel.images?.[0] !== 'string' ? hotel.images?.[0]?.image : undefined)
+    || (typeof hotel.images?.[0] === 'string' ? hotel.images[0] : '') 
+    || '/placeholder-hotel.jpg';
+    
+  const { data: session } = useSession();
 
   const handleShare = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const url = `${window.location.origin}/stay/${generateSlug(hotel.id, hotel.name)}`;
+    const hotelSlug = hotel.slug || generateSlug(hotel.id, hotel.name);
+    const urlObj = new URL(`${window.location.origin}/stay/${hotelSlug}`);
+    
+    if (session?.user) {
+      if (session.user.name) urlObj.searchParams.set('agent_name', session.user.name);
+      if (session.user.email) urlObj.searchParams.set('agent_email', session.user.email);
+      if ((session.user as { phone?: string }).phone) urlObj.searchParams.set('agent_phone', (session.user as { phone?: string }).phone!);
+    }
+    
+    const url = urlObj.toString();
     
     try {
       if (navigator.share) {
@@ -63,7 +89,7 @@ export const HotelCard = memo(function HotelCard({
         toast.error('Failed to share link.');
       }
     }
-  }, [hotel.id, hotel.name]);
+  }, [hotel.id, hotel.name, hotel.slug, session?.user]);
 
   const netRate = hotel.b2b_pricing?.net_rate ? parseFloat(hotel.b2b_pricing.net_rate) : 0;
   const tacAmount = hotel.b2b_pricing?.tac_amount ? parseFloat(hotel.b2b_pricing.tac_amount) : 0;

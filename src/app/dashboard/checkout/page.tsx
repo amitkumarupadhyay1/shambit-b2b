@@ -5,11 +5,46 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import api from '../../../lib/api';
 import { Info, ChevronDown, ChevronUp } from 'lucide-react';
 
+import { useRazorpay } from '../../../components/common/RazorpayPaymentHandler';
+
+interface VipRequest {
+  temple_name: string;
+  darshan_date: string;
+  time_slot: string;
+  needs_guide: boolean;
+}
+
+interface TransportRequest {
+  request_type: string;
+  vehicle_preference: string;
+  remarks: string;
+}
+
+interface CheckoutPayload {
+  hotel_booking_id?: number;
+  hotel_id?: number;
+  check_in?: string;
+  check_out?: string;
+  adults?: number;
+  room_id?: number;
+  num_rooms?: number;
+  primary_guest_name: string;
+  contact_email: string;
+  contact_phone: string;
+  special_requests: string;
+  floor_preference: boolean;
+  kitchen_dining_requested: boolean;
+  payment_mode: string;
+  vip_requests: VipRequest[];
+  transport_requests: TransportRequest[];
+}
+
 function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const hotelId = searchParams.get('hotel_id');
   const roomId = searchParams.get('room_id');
+  const hotelBookingId = searchParams.get('hotel_booking_id');
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -35,6 +70,10 @@ function CheckoutContent() {
     ? { base_price: basePrice, net_rate: netRate, tac_amount: tacAmount }
     : null;
   const [showLedgerDetails, setShowLedgerDetails] = useState(false);
+  
+  const [paymentMode, setPaymentMode] = useState('LEDGER_HOLD');
+  const [customAmount, setCustomAmount] = useState<string>('');
+  const { openRazorpay } = useRazorpay();
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,29 +85,43 @@ function CheckoutContent() {
     const parsedAdults = Number(searchParams.get('adults'));
     const checkIn = searchParams.get('check_in');
     const checkOut = searchParams.get('check_out');
-    if (!Number.isInteger(parsedHotelId) || parsedHotelId < 1 || !Number.isInteger(parsedRoomId) || parsedRoomId < 1 || !Number.isInteger(parsedAdults) || parsedAdults < 1 || !checkIn || !checkOut) {
+    
+    if (!hotelBookingId && (!Number.isInteger(parsedHotelId) || parsedHotelId < 1 || !Number.isInteger(parsedRoomId) || parsedRoomId < 1 || !Number.isInteger(parsedAdults) || parsedAdults < 1 || !checkIn || !checkOut)) {
       setError('Your booking details are incomplete or invalid. Return to search and select the hotel again.');
       setLoading(false);
       return;
     }
+
+    let amountToPay = 0;
+    if (paymentMode === 'PARTIAL_PAYMENT' && pricing) {
+      amountToPay = Number(customAmount);
+      const minRequired = Number(pricing.net_rate) * 0.25;
+      if (amountToPay < minRequired) {
+        setError(`Minimum payment required is 25% (₹${minRequired.toFixed(2)})`);
+        setLoading(false);
+        return;
+      }
+      if (amountToPay > Number(pricing.net_rate)) {
+        setError(`Payment cannot exceed total amount (₹${pricing.net_rate})`);
+        setLoading(false);
+        return;
+      }
+    } else if (paymentMode === 'FULL_PAYMENT' && pricing) {
+      amountToPay = Number(pricing.net_rate);
+    }
     
     try {
-      const payload = {
-        hotel_id: parsedHotelId,
-        check_in: checkIn,
-        check_out: checkOut,
-        adults: parsedAdults,
-        room_id: parsedRoomId,
-        num_rooms: 1,
+      const payload: CheckoutPayload = {
         primary_guest_name: primaryGuest,
         contact_email: contactEmail,
         contact_phone: contactPhone,
         special_requests: specialRequests,
         floor_preference: preferredFloor === "high",
         kitchen_dining_requested: false,
+        payment_mode: paymentMode === 'LEDGER_HOLD' ? 'LEDGER_HOLD' : 'PARTIAL_PAYMENT',
         vip_requests: vipDarshan ? [{
           temple_name: "Local Temple",
-          darshan_date: searchParams.get('check_in'),
+          darshan_date: checkIn || "",
           time_slot: "Morning",
           needs_guide: false
         }] : [],
@@ -79,13 +132,63 @@ function CheckoutContent() {
         }] : []
       };
 
+      if (hotelBookingId) {
+        payload.hotel_booking_id = Number(hotelBookingId);
+      } else {
+        payload.hotel_id = parsedHotelId;
+        payload.check_in = checkIn || undefined;
+        payload.check_out = checkOut || undefined;
+        payload.adults = parsedAdults;
+        payload.room_id = parsedRoomId;
+        payload.num_rooms = 1;
+      }
+
       const response = await api.post('/b2b/checkout/', payload);
       
       if (response.data.status === 'success') {
-        setSuccess(`Booking confirmed. Reference: ${response.data.booking_reference}`);
-        setTimeout(() => {
-          router.push('/dashboard/bookings');
-        }, 3000);
+        if (paymentMode === 'LEDGER_HOLD') {
+          setSuccess(`Booking confirmed. Reference: ${response.data.booking_reference}`);
+          setTimeout(() => {
+            router.push('/dashboard/bookings');
+          }, 3000);
+        } else {
+          // Initiate Razorpay Payment
+          const initiateRes = await api.post(`/b2b-bookings/${response.data.booking_id}/initiate-payment/`, {
+            amount: amountToPay
+          });
+          
+          if (initiateRes.data.order_id) {
+            openRazorpay({
+              key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '',
+              amount: initiateRes.data.amount,
+              currency: initiateRes.data.currency,
+              name: 'ShamBit Travels',
+              description: `Booking ${response.data.booking_reference}`,
+              order_id: initiateRes.data.order_id,
+              prefill: {
+                name: primaryGuest,
+                email: contactEmail,
+                contact: contactPhone,
+              },
+              handler: () => {
+                setSuccess(`Payment successful! Booking confirmed. Reference: ${response.data.booking_reference}`);
+                setTimeout(() => {
+                  router.push('/dashboard/bookings');
+                }, 3000);
+              },
+              modal: {
+                ondismiss: () => {
+                  setError('Payment cancelled. Booking is saved in DRAFT state. You can pay later from the dashboard.');
+                  setTimeout(() => {
+                    router.push('/dashboard/bookings');
+                  }, 4000);
+                }
+              }
+            });
+          } else {
+             setError('Failed to initiate payment.');
+          }
+        }
       } else {
         setError(response.data.message || 'Checkout failed');
       }
@@ -97,7 +200,7 @@ function CheckoutContent() {
     }
   };
 
-  if (!hotelId) {
+  if (!hotelId && !hotelBookingId) {
     return <div className="p-4 rounded-xl bg-red-50 text-red-700">No hotel selected for checkout.</div>;
   }
 
@@ -202,6 +305,81 @@ function CheckoutContent() {
                 placeholder="Dietary requirements, extra beds, etc."
               />
             </div>
+            
+            {pricing && (
+              <>
+                <h2 className="text-lg font-semibold text-slate-800 mb-4 border-b border-slate-100 pb-2 mt-8">Payment Method</h2>
+                <div className="space-y-4 mb-8">
+                  <label className="flex items-start p-4 border border-slate-200 rounded-xl cursor-pointer hover:border-orange-300 transition-colors bg-white">
+                    <div className="flex items-center h-5">
+                      <input 
+                        type="radio" 
+                        name="payment_mode"
+                        value="LEDGER_HOLD"
+                        checked={paymentMode === 'LEDGER_HOLD'}
+                        onChange={(e) => setPaymentMode(e.target.value)}
+                        className="focus:ring-orange-500 h-4 w-4 text-orange-600 border-gray-300"
+                      />
+                    </div>
+                    <div className="ml-3">
+                      <span className="font-medium text-slate-800 block">Ledger Hold</span>
+                      <span className="text-sm text-slate-500">Deduct ₹{pricing.net_rate} from your B2B credit limit.</span>
+                    </div>
+                  </label>
+                  
+                  <label className="flex items-start p-4 border border-slate-200 rounded-xl cursor-pointer hover:border-orange-300 transition-colors bg-white">
+                    <div className="flex items-center h-5">
+                      <input 
+                        type="radio" 
+                        name="payment_mode"
+                        value="FULL_PAYMENT"
+                        checked={paymentMode === 'FULL_PAYMENT'}
+                        onChange={(e) => setPaymentMode(e.target.value)}
+                        className="focus:ring-orange-500 h-4 w-4 text-orange-600 border-gray-300"
+                      />
+                    </div>
+                    <div className="ml-3">
+                      <span className="font-medium text-slate-800 block">Online Payment (Full)</span>
+                      <span className="text-sm text-slate-500">Pay the full amount (₹{pricing.net_rate}) securely via Razorpay.</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start p-4 border border-slate-200 rounded-xl cursor-pointer hover:border-orange-300 transition-colors bg-white">
+                    <div className="flex items-center h-5">
+                      <input 
+                        type="radio" 
+                        name="payment_mode"
+                        value="PARTIAL_PAYMENT"
+                        checked={paymentMode === 'PARTIAL_PAYMENT'}
+                        onChange={(e) => {
+                          setPaymentMode(e.target.value);
+                          setCustomAmount((Number(pricing.net_rate) * 0.25).toFixed(2));
+                        }}
+                        className="focus:ring-orange-500 h-4 w-4 text-orange-600 border-gray-300"
+                      />
+                    </div>
+                    <div className="ml-3 w-full">
+                      <span className="font-medium text-slate-800 block">Online Payment (Partial)</span>
+                      <span className="text-sm text-slate-500 block mb-3">Pay a minimum 25% (₹{(Number(pricing.net_rate) * 0.25).toFixed(2)}) now to confirm, balance later.</span>
+                      {paymentMode === 'PARTIAL_PAYMENT' && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-sm font-medium text-slate-600">₹</span>
+                          <input 
+                            type="number"
+                            min={Number(pricing.net_rate) * 0.25}
+                            max={Number(pricing.net_rate)}
+                            step="0.01"
+                            value={customAmount}
+                            onChange={(e) => setCustomAmount(e.target.value)}
+                            className="block w-full max-w-[200px] px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </label>
+                </div>
+              </>
+            )}
 
             <div>
               <button 

@@ -36,6 +36,7 @@ export function ImageWithFallback({
       {...rest}
       src={imgSrc}
       alt={alt}
+      unoptimized={true}
       onError={() => {
         if (imgSrc !== fallbackSrc && fallbackSrc) {
           setImgSrc(fallbackSrc);

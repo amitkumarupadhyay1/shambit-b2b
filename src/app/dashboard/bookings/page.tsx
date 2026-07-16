@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import api from '../../../lib/api';
+import { useRazorpay } from '../../../components/common/RazorpayPaymentHandler';
 
 interface B2BBooking {
   id: number;
@@ -10,6 +11,8 @@ interface B2BBooking {
   booking_reference: string | null;
   booking_status: string | null;
   b2b_selling_total: string;
+  pending_amount: string;
+  accumulated_payment: string;
   payment_mode: string;
 }
 
@@ -23,24 +26,69 @@ export default function BookingsPage() {
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  
+  const { openRazorpay } = useRazorpay();
 
+  const fetchBookings = async () => {
+    try {
+      setLoadingBookings(true);
+      const response = await api.get('/b2b/bookings/');
+      const data = response.data.results ?? response.data;
+      setBookings(Array.isArray(data) ? data : []);
+    } catch {
+      setError('Unable to load bookings. Please refresh the page.');
+    } finally {
+      setLoadingBookings(false);
+    }
+  };
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        setLoadingBookings(true);
-        const response = await api.get('/b2b/bookings/');
-        const data = response.data.results ?? response.data;
-        if (!cancelled) setBookings(Array.isArray(data) ? data : []);
-      } catch {
-        if (!cancelled) setError('Unable to load bookings. Please refresh the page.');
-      } finally {
-        if (!cancelled) setLoadingBookings(false);
-      }
-    })();
-    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchBookings();
   }, []);
+
+  const handlePayBalance = async (booking: B2BBooking) => {
+    const bookingPk = booking.booking || booking.hotel_booking;
+    if (!bookingPk) return;
+    
+    setLoading(true);
+    setError('');
+    setMessage('');
+    
+    try {
+      const initiateRes = await api.post(`/b2b-bookings/${bookingPk}/initiate-payment/`, {
+        amount: Number(booking.pending_amount)
+      });
+      
+      if (initiateRes.data.order_id) {
+        openRazorpay({
+          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '',
+          amount: initiateRes.data.amount,
+          currency: initiateRes.data.currency,
+          name: 'ShamBit Travels',
+          description: `Balance Payment for ${booking.booking_reference || bookingPk}`,
+          order_id: initiateRes.data.order_id,
+          handler: () => {
+            setMessage('Payment successful! Balance cleared.');
+            fetchBookings();
+          },
+          modal: {
+            ondismiss: () => {
+              setError('Payment cancelled.');
+              setLoading(false);
+            }
+          }
+        });
+      } else {
+        setError('Failed to initiate payment.');
+        setLoading(false);
+      }
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setError(e.response?.data?.error || 'Failed to initiate payment.');
+      setLoading(false);
+    }
+  };
 
   const handleUpload = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -94,7 +142,46 @@ export default function BookingsPage() {
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-6 py-4"><h2 className="font-semibold text-slate-800">Recent bookings</h2></div>
         {loadingBookings ? <div className="p-6 text-sm text-slate-500">Loading bookings…</div> : bookings.length === 0 ? <div className="p-6 text-sm text-slate-500">No B2B bookings yet.</div> : (
-          <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead className="bg-slate-50 text-left text-slate-500"><tr><th className="px-6 py-3">Reference</th><th className="px-6 py-3">Status</th><th className="px-6 py-3">Payment</th><th className="px-6 py-3 text-right">Amount</th></tr></thead><tbody className="divide-y divide-slate-100">{bookings.map((booking) => <tr key={booking.id}><td className="px-6 py-4 font-medium text-slate-800">{booking.booking_reference || `Booking #${booking.id}`}</td><td className="px-6 py-4 text-slate-600">{booking.booking_status || '—'}</td><td className="px-6 py-4 text-slate-600">{booking.payment_mode}</td><td className="px-6 py-4 text-right font-medium text-slate-800">₹{Number(booking.b2b_selling_total).toLocaleString()}</td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50 text-left text-slate-500">
+                <tr>
+                  <th className="px-6 py-3">Reference</th>
+                  <th className="px-6 py-3">Status</th>
+                  <th className="px-6 py-3">Payment Mode</th>
+                  <th className="px-6 py-3 text-right">Total Amount</th>
+                  <th className="px-6 py-3 text-right">Paid</th>
+                  <th className="px-6 py-3 text-right">Pending</th>
+                  <th className="px-6 py-3 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {bookings.map((booking) => (
+                  <tr key={booking.id}>
+                    <td className="px-6 py-4 font-medium text-slate-800">{booking.booking_reference || `Booking #${booking.id}`}</td>
+                    <td className="px-6 py-4 text-slate-600">{booking.booking_status || '—'}</td>
+                    <td className="px-6 py-4 text-slate-600">{booking.payment_mode}</td>
+                    <td className="px-6 py-4 text-right font-medium text-slate-800">₹{Number(booking.b2b_selling_total).toLocaleString()}</td>
+                    <td className="px-6 py-4 text-right text-slate-600">₹{Number(booking.accumulated_payment || 0).toLocaleString()}</td>
+                    <td className="px-6 py-4 text-right text-orange-600 font-medium">₹{Number(booking.pending_amount || 0).toLocaleString()}</td>
+                    <td className="px-6 py-4 text-center">
+                      {Number(booking.pending_amount || 0) > 0 && booking.payment_mode === 'PARTIAL_PAYMENT' ? (
+                        <button
+                          onClick={() => handlePayBalance(booking)}
+                          disabled={loading}
+                          className="px-3 py-1.5 bg-orange-100 text-orange-700 hover:bg-orange-200 rounded-lg text-xs font-medium transition-colors"
+                        >
+                          Pay Balance
+                        </button>
+                      ) : (
+                        <span className="text-slate-400 text-xs">Settled</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 

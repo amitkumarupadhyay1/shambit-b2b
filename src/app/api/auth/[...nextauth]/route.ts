@@ -29,12 +29,16 @@ const authOptions: AuthOptions = {
             return {
               id: data.user?.id || '1',
               email: credentials.email,
+              name: data.user?.name || (data.user?.first_name ? `${data.user.first_name} ${data.user.last_name || ''}`.trim() : ''),
+              phone: data.user?.phone || data.user?.mobile || data.user?.phone_number || '',
               accessToken: data.access,
             }
           } else if (res.status === 200 && data && data.token) {
             return {
               id: data.user?.id || '1',
               email: credentials.email,
+              name: data.user?.name || (data.user?.first_name ? `${data.user.first_name} ${data.user.last_name || ''}`.trim() : ''),
+              phone: data.user?.phone || data.user?.mobile || data.user?.phone_number || '',
               accessToken: data.token,
             }
           }
@@ -50,12 +54,18 @@ const authOptions: AuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.accessToken = user.accessToken
+        token.accessToken = (user as { accessToken?: string }).accessToken
+        token.name = user.name
+        token.phone = (user as { phone?: string }).phone
       }
       return token
     },
     async session({ session, token }) {
-      session.accessToken = token.accessToken as string
+      (session as { accessToken?: string }).accessToken = token.accessToken as string
+      if (session.user) {
+        session.user.name = token.name as string | null | undefined
+        ;(session.user as { phone?: string }).phone = token.phone as string | undefined
+      }
       return session
     }
   },

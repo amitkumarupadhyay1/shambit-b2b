@@ -4,19 +4,14 @@ import PublicPropertyView from '../../../components/property/PublicPropertyView'
 
 // Helper to fetch and securely scrub data
 async function getPublicHotelData(slug: string) {
-  // Extract ID from the slug using regex (e.g., "142-ayodhya-grand" -> "142" or just "142")
-  const match = slug.match(/^(\d+)(?:-|$)/);
-  if (!match) return null;
-  
-  const hotelId = parseInt(match[1], 10);
-  if (isNaN(hotelId)) return null;
+  if (!slug) return null;
 
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    if (!apiUrl) throw new Error("NEXT_PUBLIC_API_URL environment variable is not set");
+    const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
+    if (!apiUrl) throw new Error("API URL environment variable is not set");
     
-    // Attempt to fetch from the explicit endpoint if it exists
-    const response = await fetch(`${apiUrl}/hotels/${hotelId}/`, {
+    // Attempt to fetch from the explicit endpoint using the slug
+    const response = await fetch(`${apiUrl}/hotels/${slug}/`, {
       next: { revalidate: 3600 } // Cache for 1 hour for fast public serving
     });
 
@@ -38,21 +33,36 @@ async function getPublicHotelData(slug: string) {
     const publicData = {
       id: data.id,
       name: data.name,
-      address: data.address,
+      address: data.full_address || data.short_address || data.address || '',
+      latitude: data.latitude,
+      longitude: data.longitude,
+      nearby_places: data.nearby_places || [],
       description: data.description || '',
       star_rating: data.star_rating || 3,
-      images: data.images || [],
-      rooms: data.rooms || []
+      images: data.media || data.images || [],
+      amenities: data.amenities || [],
+      rooms: data.room_types || data.rooms || []
     };
     
     // Explicitly delete any known pricing fields just in case they slipped into rooms array
-    publicData.rooms = publicData.rooms.map((room: { name?: string; description?: string; [key: string]: unknown }) => {
+    publicData.rooms = publicData.rooms.map((room: Record<string, unknown>) => {
       const safeRoom = { ...room };
       delete safeRoom.b2b_pricing;
       delete safeRoom.b2c_pricing;
       delete safeRoom.base_rate;
       delete safeRoom.net_rate;
       delete safeRoom.tac;
+      delete safeRoom.base_price_per_night;
+      delete safeRoom.discounted_base_price_per_night;
+      delete safeRoom.retail_price_per_night;
+      delete safeRoom.payout_price_per_night;
+      delete safeRoom.declared_tariff;
+      
+      // Ensure we keep media and amenities/facilities
+      safeRoom.media = room.media || [];
+      safeRoom.amenities = room.amenities || [];
+      safeRoom.facilities = room.facilities || [];
+      
       return safeRoom;
     });
 
@@ -74,13 +84,15 @@ export async function generateMetadata(
     return { title: 'Property Not Found' };
   }
 
-  const primaryImage = hotel.images?.find((img: { is_primary: boolean; image: string }) => img.is_primary)?.image 
+  const primaryImage = hotel.images?.find((img: { is_primary?: boolean; file_url?: string; image?: string }) => img.is_primary)?.file_url 
+                    || hotel.images?.find((img: { is_primary?: boolean; file_url?: string; image?: string }) => img.is_primary)?.image
+                    || hotel.images?.[0]?.file_url
                     || hotel.images?.[0]?.image 
                     || '/placeholder-hotel.jpg';
 
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    if (!apiUrl) throw new Error("NEXT_PUBLIC_API_URL environment variable is not set");
+    const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
+    if (!apiUrl) throw new Error("API URL environment variable is not set");
     // Using content_type=inventory.hotel for standard hotel models
     const seoRes = await fetch(`${apiUrl}/seo/data/for_object/?content_type=inventory.hotel&object_id=${hotel.id}`);
     
@@ -129,15 +141,21 @@ export async function generateMetadata(
   };
 }
 
-export default async function StayPage(props: { params: Promise<{ slug: string }> }) {
+export default async function StayPage(props: { 
+  params: Promise<{ slug: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const params = await props.params;
+  const searchParams = props.searchParams ? await props.searchParams : {};
   const hotel = await getPublicHotelData(params.slug);
 
   if (!hotel) {
     notFound();
   }
 
-  const primaryImage = hotel.images?.find((img: { is_primary: boolean; image: string }) => img.is_primary)?.image 
+  const primaryImage = hotel.images?.find((img: { is_primary?: boolean; file_url?: string; image?: string }) => img.is_primary)?.file_url 
+                    || hotel.images?.find((img: { is_primary?: boolean; file_url?: string; image?: string }) => img.is_primary)?.image
+                    || hotel.images?.[0]?.file_url
                     || hotel.images?.[0]?.image 
                     || '';
 
@@ -159,13 +177,19 @@ export default async function StayPage(props: { params: Promise<{ slug: string }
     }
   };
 
+  const agent = {
+    name: searchParams.agent_name as string | undefined,
+    email: searchParams.agent_email as string | undefined,
+    phone: searchParams.agent_phone as string | undefined,
+  };
+
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <PublicPropertyView hotel={hotel} />
+      <PublicPropertyView hotel={hotel} agent={agent} />
     </>
   );
 }

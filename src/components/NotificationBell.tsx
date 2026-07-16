@@ -56,7 +56,7 @@ export function NotificationBell() {
     );
 
     try {
-      await api.post(`/notifications/${id}/read/`);
+      await api.post(`/notifications/${id}/mark_read/`);
       mutate(); // Revalidate from server
     } catch (error) {
       console.error('Failed to mark notification as read', error);
@@ -90,7 +90,7 @@ export function NotificationBell() {
               <button
                 onClick={async () => {
                   try {
-                    await api.post('/notifications/read-all/');
+                    await api.post('/notifications/mark_all_read/');
                     mutate();
                   } catch (e) {
                     console.error(e);

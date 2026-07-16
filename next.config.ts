@@ -21,6 +21,14 @@ const nextConfig: NextConfig = {
         protocol: 'http',
         hostname: 'localhost',
       },
+      {
+        protocol: 'http',
+        hostname: '172.*.*.*',
+      },
+      {
+        protocol: 'http',
+        hostname: '192.168.*.*',
+      },
     ],
   },
   async rewrites() {

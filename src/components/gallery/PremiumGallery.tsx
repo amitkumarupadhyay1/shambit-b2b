@@ -13,7 +13,7 @@ import Fullscreen from 'yet-another-react-lightbox/plugins/fullscreen';
 const Lightbox = dynamic(() => import('yet-another-react-lightbox'), { ssr: false });
 
 interface PremiumGalleryProps {
-  images: Array<{ id: number; image: string; is_primary: boolean }>;
+  images: Array<{ id?: number; file_url?: string; image?: string; is_primary?: boolean; alt_text?: string }>;
   hotelName: string;
 }
 
@@ -33,7 +33,7 @@ export default function PremiumGallery({ images, hotelName }: PremiumGalleryProp
   const secondaryImages = images.filter(img => img.id !== primaryImage.id).slice(0, 4);
   
   // Format slides for Lightbox
-  const slides = images.map(img => ({ src: img.image, alt: hotelName }));
+  const slides = images.map(img => ({ src: img.file_url || img.image || '', alt: img.alt_text || hotelName }));
 
   const openLightbox = (idx: number) => {
     // Find the actual index in the full images array
@@ -51,8 +51,8 @@ export default function PremiumGallery({ images, hotelName }: PremiumGalleryProp
           onClick={() => openLightbox(images.findIndex(img => img.id === primaryImage.id))}
         >
           <Image 
-            src={primaryImage.image} 
-            alt={`${hotelName} - Hero`} 
+            src={primaryImage.file_url || primaryImage.image || ''} 
+            alt={primaryImage.alt_text || `${hotelName} - Hero`} 
             fill 
             className="object-cover transition-transform duration-700 hover:scale-105"
             priority
@@ -69,8 +69,8 @@ export default function PremiumGallery({ images, hotelName }: PremiumGalleryProp
             onClick={() => openLightbox(images.findIndex(i => i.id === img.id))}
           >
             <Image 
-              src={img.image} 
-              alt={`${hotelName} - View ${idx + 1}`} 
+              src={img.file_url || img.image || ''} 
+              alt={img.alt_text || `${hotelName} - View ${idx + 1}`} 
               fill 
               className="object-cover transition-transform duration-700 hover:scale-105"
               sizes="25vw"
@@ -101,8 +101,8 @@ export default function PremiumGallery({ images, hotelName }: PremiumGalleryProp
           onClick={() => openLightbox(0)}
         >
           <Image 
-            src={primaryImage.image} 
-            alt={hotelName} 
+            src={primaryImage.file_url || primaryImage.image || ''} 
+            alt={primaryImage.alt_text || hotelName} 
             fill 
             className="object-cover rounded-xl"
             priority
