@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '../../../lib/api';
 import { Info, ChevronDown, ChevronUp } from 'lucide-react';
 
-import { useRazorpay } from '../../../components/common/RazorpayPaymentHandler';
 
 interface VipRequest {
   temple_name: string;
@@ -21,13 +20,6 @@ interface TransportRequest {
 }
 
 interface CheckoutPayload {
-  hotel_booking_id?: number;
-  hotel_id?: number;
-  check_in?: string;
-  check_out?: string;
-  adults?: number;
-  room_id?: number;
-  num_rooms?: number;
   primary_guest_name: string;
   contact_email: string;
   contact_phone: string;
@@ -39,16 +31,40 @@ interface CheckoutPayload {
   transport_requests: TransportRequest[];
 }
 
+interface OrderLine {
+  id: number;
+  quantity: number;
+  room_type_name: string;
+  line_type: string;
+  total_amount: string;
+}
+
+interface OrderData {
+  hotel_name: string;
+  check_in: string;
+  check_out: string;
+  total_guests: number;
+  total_rooms: number;
+  booking_mode: string;
+  lines: OrderLine[];
+  pricing_snapshot: {
+    b2c_total: string;
+    hotel_net_total: string;
+    agent_tac_total: string;
+    net_rate: string;
+  };
+}
+
 function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const hotelId = searchParams.get('hotel_id');
-  const roomId = searchParams.get('room_id');
-  const hotelBookingId = searchParams.get('hotel_booking_id');
+  const reference = searchParams.get('reference');
   
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  const [orderData, setOrderData] = useState<OrderData | null>(null);
   
   const [primaryGuest, setPrimaryGuest] = useState('');
   const [contactEmail, setContactEmail] = useState('');
@@ -59,55 +75,57 @@ function CheckoutContent() {
   const [localTransport, setLocalTransport] = useState(false);
   const [preferredFloor, setPreferredFloor] = useState('any');
   
-  const basePrice = searchParams.get('base_price');
-  const netRate = searchParams.get('net_rate');
-  const tacAmount = searchParams.get('tac_amount');
-  const hasLivePricing = [basePrice, netRate, tacAmount].every((value) => {
-    const parsed = Number(value);
-    return value !== null && Number.isFinite(parsed) && parsed >= 0;
-  });
-  const pricing = hasLivePricing && basePrice && netRate && tacAmount
-    ? { base_price: basePrice, net_rate: netRate, tac_amount: tacAmount }
-    : null;
   const [showLedgerDetails, setShowLedgerDetails] = useState(false);
-  
   const [paymentMode, setPaymentMode] = useState('LEDGER_HOLD');
   const [customAmount, setCustomAmount] = useState<string>('');
-  const { openRazorpay } = useRazorpay();
+  
+
+
+  useEffect(() => {
+    if (!reference) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setError('No booking reference provided.');
+      setLoading(false);
+      return;
+    }
+
+    const fetchOrder = async () => {
+      try {
+        const res = await api.get(`/b2b/orders/${reference}/`);
+        setOrderData(res.data);
+      } catch (err: unknown) {
+        const error = err as { response?: { data?: { error?: string } } };
+        setError(error.response?.data?.error || 'Failed to load booking details.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOrder();
+  }, [reference]);
+
+  const pricing = orderData?.pricing_snapshot;
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    const parsedHotelId = Number(hotelId);
-    const parsedRoomId = Number(roomId);
-    const parsedAdults = Number(searchParams.get('adults'));
-    const checkIn = searchParams.get('check_in');
-    const checkOut = searchParams.get('check_out');
-    
-    if (!hotelBookingId && (!Number.isInteger(parsedHotelId) || parsedHotelId < 1 || !Number.isInteger(parsedRoomId) || parsedRoomId < 1 || !Number.isInteger(parsedAdults) || parsedAdults < 1 || !checkIn || !checkOut)) {
-      setError('Your booking details are incomplete or invalid. Return to search and select the hotel again.');
-      setLoading(false);
-      return;
-    }
-
     let amountToPay = 0;
     if (paymentMode === 'PARTIAL_PAYMENT' && pricing) {
       amountToPay = Number(customAmount);
-      const minRequired = Number(pricing.net_rate) * 0.25;
+      const minRequired = Number(pricing.hotel_net_total) * 0.25;
       if (amountToPay < minRequired) {
         setError(`Minimum payment required is 25% (₹${minRequired.toFixed(2)})`);
         setLoading(false);
         return;
       }
-      if (amountToPay > Number(pricing.net_rate)) {
-        setError(`Payment cannot exceed total amount (₹${pricing.net_rate})`);
+      if (amountToPay > Number(pricing.hotel_net_total)) {
+        setError(`Payment cannot exceed total amount (₹${pricing.hotel_net_total})`);
         setLoading(false);
         return;
       }
     } else if (paymentMode === 'FULL_PAYMENT' && pricing) {
-      amountToPay = Number(pricing.net_rate);
+      amountToPay = Number(pricing.hotel_net_total);
     }
     
     try {
@@ -121,7 +139,7 @@ function CheckoutContent() {
         payment_mode: paymentMode === 'LEDGER_HOLD' ? 'LEDGER_HOLD' : 'PARTIAL_PAYMENT',
         vip_requests: vipDarshan ? [{
           temple_name: "Local Temple",
-          darshan_date: checkIn || "",
+          darshan_date: orderData?.check_in || "",
           time_slot: "Morning",
           needs_guide: false
         }] : [],
@@ -132,18 +150,7 @@ function CheckoutContent() {
         }] : []
       };
 
-      if (hotelBookingId) {
-        payload.hotel_booking_id = Number(hotelBookingId);
-      } else {
-        payload.hotel_id = parsedHotelId;
-        payload.check_in = checkIn || undefined;
-        payload.check_out = checkOut || undefined;
-        payload.adults = parsedAdults;
-        payload.room_id = parsedRoomId;
-        payload.num_rooms = 1;
-      }
-
-      const response = await api.post('/b2b/checkout/', payload);
+      const response = await api.post(`/b2b/reservations/${reference}/checkout/`, payload);
       
       if (response.data.status === 'success') {
         if (paymentMode === 'LEDGER_HOLD') {
@@ -152,56 +159,29 @@ function CheckoutContent() {
             router.push('/dashboard/bookings');
           }, 3000);
         } else {
-          // Initiate Razorpay Payment
-          const initiateRes = await api.post(`/b2b-bookings/${response.data.booking_id}/initiate-payment/`, {
-            amount: amountToPay
-          });
-          
-          if (initiateRes.data.order_id) {
-            openRazorpay({
-              key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '',
-              amount: initiateRes.data.amount,
-              currency: initiateRes.data.currency,
-              name: 'ShamBit Travels',
-              description: `Booking ${response.data.booking_reference}`,
-              order_id: initiateRes.data.order_id,
-              prefill: {
-                name: primaryGuest,
-                email: contactEmail,
-                contact: contactPhone,
-              },
-              handler: () => {
-                setSuccess(`Payment successful! Booking confirmed. Reference: ${response.data.booking_reference}`);
-                setTimeout(() => {
-                  router.push('/dashboard/bookings');
-                }, 3000);
-              },
-              modal: {
-                ondismiss: () => {
-                  setError('Payment cancelled. Booking is saved in DRAFT state. You can pay later from the dashboard.');
-                  setTimeout(() => {
-                    router.push('/dashboard/bookings');
-                  }, 4000);
-                }
-              }
-            });
-          } else {
-             setError('Failed to initiate payment.');
-          }
+           setError('Online payment flow is not fully implemented in the new phase yet. Please use Ledger Hold.');
+           setLoading(false);
+           // Fallback to Razorpay if it was integrated properly with parent order.
         }
       } else {
-        setError(response.data.message || 'Checkout failed');
+        setError(response.data.error || 'Checkout failed');
       }
     } catch (err) {
       const error = err as { response?: { data?: { error?: string } } };
       setError(error.response?.data?.error || 'An error occurred during checkout.');
     } finally {
-      setLoading(false);
+      if (paymentMode === 'LEDGER_HOLD') {
+        setLoading(false);
+      }
     }
   };
 
-  if (!hotelId && !hotelBookingId) {
-    return <div className="p-4 rounded-xl bg-red-50 text-red-700">No hotel selected for checkout.</div>;
+  if (loading && !orderData) {
+    return <div className="p-8 text-center text-slate-500">Loading checkout details...</div>;
+  }
+
+  if (!reference) {
+    return <div className="p-4 rounded-xl bg-red-50 text-red-700">No booking reference provided for checkout.</div>;
   }
 
   return (
@@ -323,7 +303,7 @@ function CheckoutContent() {
                     </div>
                     <div className="ml-3">
                       <span className="font-medium text-slate-800 block">Ledger Hold</span>
-                      <span className="text-sm text-slate-500">Deduct ₹{pricing.net_rate} from your B2B credit limit.</span>
+                      <span className="text-sm text-slate-500">Deduct ₹{parseFloat(pricing.hotel_net_total).toLocaleString()} from your B2B credit limit.</span>
                     </div>
                   </label>
                   
@@ -340,7 +320,7 @@ function CheckoutContent() {
                     </div>
                     <div className="ml-3">
                       <span className="font-medium text-slate-800 block">Online Payment (Full)</span>
-                      <span className="text-sm text-slate-500">Pay the full amount (₹{pricing.net_rate}) securely via Razorpay.</span>
+                      <span className="text-sm text-slate-500">Pay the full amount (₹{parseFloat(pricing.hotel_net_total).toLocaleString()}) securely via Razorpay.</span>
                     </div>
                   </label>
 
@@ -360,14 +340,14 @@ function CheckoutContent() {
                     </div>
                     <div className="ml-3 w-full">
                       <span className="font-medium text-slate-800 block">Online Payment (Partial)</span>
-                      <span className="text-sm text-slate-500 block mb-3">Pay a minimum 25% (₹{(Number(pricing.net_rate) * 0.25).toFixed(2)}) now to confirm, balance later.</span>
+                      <span className="text-sm text-slate-500 block mb-3">Pay a minimum 25% (₹{(Number(pricing.hotel_net_total) * 0.25).toFixed(2)}) now to confirm, balance later.</span>
                       {paymentMode === 'PARTIAL_PAYMENT' && (
                         <div className="flex items-center gap-2 mt-2">
                           <span className="text-sm font-medium text-slate-600">₹</span>
                           <input 
                             type="number"
-                            min={Number(pricing.net_rate) * 0.25}
-                            max={Number(pricing.net_rate)}
+                            min={Number(pricing.hotel_net_total) * 0.25}
+                            max={Number(pricing.hotel_net_total)}
                             step="0.01"
                             value={customAmount}
                             onChange={(e) => setCustomAmount(e.target.value)}
@@ -398,31 +378,42 @@ function CheckoutContent() {
             <h3 className="font-semibold text-slate-900 mb-4 text-lg border-b border-slate-100 pb-2">Booking Summary</h3>
             <div className="space-y-3 mb-6">
               <div className="flex justify-between items-center text-sm">
+                <span className="text-slate-500">Hotel</span>
+                <strong className="text-slate-800">{orderData?.hotel_name}</strong>
+              </div>
+              <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-500">Check In</span>
-                <strong className="text-slate-800">{searchParams.get('check_in')}</strong>
+                <strong className="text-slate-800">{orderData?.check_in}</strong>
               </div>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-500">Check Out</span>
-                <strong className="text-slate-800">{searchParams.get('check_out')}</strong>
+                <strong className="text-slate-800">{orderData?.check_out}</strong>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-500">Guests</span>
-                <strong className="text-slate-800">{searchParams.get('adults')} Adults</strong>
+                <span className="text-slate-500">Guests & Rooms</span>
+                <strong className="text-slate-800">{orderData?.total_guests} Guests, {orderData?.total_rooms} Rooms</strong>
               </div>
+              
+              {orderData?.lines.map((line) => (
+                <div key={line.id} className="flex justify-between items-center text-xs text-slate-600 pl-2 border-l-2 border-slate-200">
+                  <span>{line.quantity}x {line.room_type_name || (line.line_type === 'GLOBAL' ? 'Global Plan' : 'Allocation')}</span>
+                  <span>₹{parseFloat(line.total_amount).toLocaleString()}</span>
+                </div>
+              ))}
             </div>
             
             {pricing ? (
               <div className="mb-6 space-y-4">
                 <div className="border-t border-slate-100 pt-4">
                   <div className="flex justify-between items-center text-sm mb-2">
-                    <span className="text-slate-600 font-medium">Retail Price</span>
-                    <span className="text-slate-800 font-bold line-through">₹{pricing.base_price}</span>
+                    <span className="text-slate-600 font-medium">Retail Price (B2C)</span>
+                    <span className="text-slate-800 font-bold line-through">₹{parseFloat(pricing.b2c_total).toLocaleString()}</span>
                   </div>
                   
                   <div className="flex justify-between items-center text-lg mb-4">
                     <span className="text-slate-800 font-black">Amount to Debit</span>
                     <span className="text-slate-900 font-black">
-                      ₹{Number(pricing.net_rate).toFixed(2)}
+                      ₹{parseFloat(pricing.hotel_net_total).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -443,21 +434,15 @@ function CheckoutContent() {
                     <div className="p-4 bg-white border-t border-slate-200 space-y-3">
                       <div className="flex justify-between items-end text-sm">
                         <span className="text-slate-600 font-medium">B2B Net Rate</span>
-                        <span className="text-slate-900 font-bold">₹{pricing.net_rate}</span>
+                        <span className="text-slate-900 font-bold">₹{parseFloat(pricing.hotel_net_total).toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between items-end text-sm">
-                        <span className="text-green-600 font-medium">Your Commission</span>
-                        <span className="text-green-700 font-bold">₹{pricing.tac_amount}</span>
-                      </div>
-                      <div className="pt-2 mt-2 border-t border-slate-100 flex justify-between items-end">
-                        <span className="text-slate-800 font-bold text-sm">Total Profit</span>
-                        <span className="text-green-600 font-black text-lg">
-                          ₹{Number(pricing.tac_amount).toFixed(2)}
-                        </span>
+                        <span className="text-green-600 font-medium">Your Commission (TAC)</span>
+                        <span className="text-green-700 font-bold">₹{parseFloat(pricing.agent_tac_total).toLocaleString()}</span>
                       </div>
                       <div className="pt-2 mt-2 border-t border-slate-100 flex justify-between items-end bg-red-50 p-2 rounded-lg mt-4">
                         <span className="text-slate-800 font-black text-sm">Amount to Debit</span>
-                        <span className="text-red-600 font-black text-lg">₹{pricing.net_rate}</span>
+                        <span className="text-red-600 font-black text-lg">₹{parseFloat(pricing.hotel_net_total).toLocaleString()}</span>
                       </div>
                     </div>
                   )}

@@ -2,23 +2,22 @@
 
 import { useEffect, useState } from 'react';
 import api from '../../../lib/api';
-import { useRazorpay } from '../../../components/common/RazorpayPaymentHandler';
 
-interface B2BBooking {
+interface B2BOrder {
   id: number;
-  booking: number | null;
-  hotel_booking: number | null;
-  booking_reference: string | null;
-  booking_status: string | null;
+  booking_reference: string;
+  hotel_name: string;
+  check_in: string;
+  check_out: string;
+  status: string;
+  booking_mode: string;
+  total_rooms: number;
   b2b_selling_total: string;
-  pending_amount: string;
-  accumulated_payment: string;
-  payment_mode: string;
 }
 
 export default function BookingsPage() {
-  const [bookings, setBookings] = useState<B2BBooking[]>([]);
-  const [bookingId, setBookingId] = useState('');
+  const [orders, setOrders] = useState<B2BOrder[]>([]);
+  const [bookingRef, setBookingRef] = useState('');
   const [travellerName, setTravellerName] = useState('');
   const [aadhaarNumber, setAadhaarNumber] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -26,15 +25,12 @@ export default function BookingsPage() {
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  
-  const { openRazorpay } = useRazorpay();
 
   const fetchBookings = async () => {
     try {
       setLoadingBookings(true);
-      const response = await api.get('/b2b/bookings/');
-      const data = response.data.results ?? response.data;
-      setBookings(Array.isArray(data) ? data : []);
+      const response = await api.get('/b2b/orders/');
+      setOrders(response.data);
     } catch {
       setError('Unable to load bookings. Please refresh the page.');
     } finally {
@@ -47,66 +43,16 @@ export default function BookingsPage() {
     fetchBookings();
   }, []);
 
-  const handlePayBalance = async (booking: B2BBooking) => {
-    const bookingPk = booking.booking || booking.hotel_booking;
-    if (!bookingPk) return;
-    
-    setLoading(true);
-    setError('');
-    setMessage('');
-    
-    try {
-      const initiateRes = await api.post(`/b2b-bookings/${bookingPk}/initiate-payment/`, {
-        amount: Number(booking.pending_amount)
-      });
-      
-      if (initiateRes.data.order_id) {
-        openRazorpay({
-          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '',
-          amount: initiateRes.data.amount,
-          currency: initiateRes.data.currency,
-          name: 'ShamBit Travels',
-          description: `Balance Payment for ${booking.booking_reference || bookingPk}`,
-          order_id: initiateRes.data.order_id,
-          handler: () => {
-            setMessage('Payment successful! Balance cleared.');
-            fetchBookings();
-          },
-          modal: {
-            ondismiss: () => {
-              setError('Payment cancelled.');
-              setLoading(false);
-            }
-          }
-        });
-      } else {
-        setError('Failed to initiate payment.');
-        setLoading(false);
-      }
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { error?: string } } };
-      setError(e.response?.data?.error || 'Failed to initiate payment.');
-      setLoading(false);
-    }
-  };
-
   const handleUpload = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!file || !bookingId || !travellerName || !aadhaarNumber) return;
+    if (!file || !bookingRef || !travellerName || !aadhaarNumber) return;
 
     setLoading(true);
     setMessage('');
     setError('');
-    const selectedBooking = bookings.find((booking) => String(booking.id) === bookingId);
-    if (!selectedBooking) {
-      setError('Select one of your bookings before uploading a document.');
-      setLoading(false);
-      return;
-    }
-
+    
     const formData = new FormData();
-    if (selectedBooking.booking) formData.append('booking_id', String(selectedBooking.booking));
-    if (selectedBooking.hotel_booking) formData.append('hotel_booking_id', String(selectedBooking.hotel_booking));
+    formData.append('order_reference', bookingRef);
     formData.append('traveller_name', travellerName);
     formData.append('aadhaar_number', aadhaarNumber);
     formData.append('aadhaar_front_image', file);
@@ -118,7 +64,7 @@ export default function BookingsPage() {
       if (response.data.status === 'success') {
         setMessage('Document uploaded successfully.');
         setFile(null);
-        setBookingId('');
+        setBookingRef('');
         setTravellerName('');
         setAadhaarNumber('');
       } else {
@@ -141,42 +87,34 @@ export default function BookingsPage() {
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-6 py-4"><h2 className="font-semibold text-slate-800">Recent bookings</h2></div>
-        {loadingBookings ? <div className="p-6 text-sm text-slate-500">Loading bookings…</div> : bookings.length === 0 ? <div className="p-6 text-sm text-slate-500">No B2B bookings yet.</div> : (
+        {loadingBookings ? <div className="p-6 text-sm text-slate-500">Loading bookings…</div> : orders.length === 0 ? <div className="p-6 text-sm text-slate-500">No B2B bookings yet.</div> : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead className="bg-slate-50 text-left text-slate-500">
                 <tr>
                   <th className="px-6 py-3">Reference</th>
+                  <th className="px-6 py-3">Hotel</th>
+                  <th className="px-6 py-3">Check In</th>
+                  <th className="px-6 py-3">Check Out</th>
+                  <th className="px-6 py-3">Mode</th>
                   <th className="px-6 py-3">Status</th>
-                  <th className="px-6 py-3">Payment Mode</th>
                   <th className="px-6 py-3 text-right">Total Amount</th>
-                  <th className="px-6 py-3 text-right">Paid</th>
-                  <th className="px-6 py-3 text-right">Pending</th>
-                  <th className="px-6 py-3 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {bookings.map((booking) => (
-                  <tr key={booking.id}>
-                    <td className="px-6 py-4 font-medium text-slate-800">{booking.booking_reference || `Booking #${booking.id}`}</td>
-                    <td className="px-6 py-4 text-slate-600">{booking.booking_status || '—'}</td>
-                    <td className="px-6 py-4 text-slate-600">{booking.payment_mode}</td>
-                    <td className="px-6 py-4 text-right font-medium text-slate-800">₹{Number(booking.b2b_selling_total).toLocaleString()}</td>
-                    <td className="px-6 py-4 text-right text-slate-600">₹{Number(booking.accumulated_payment || 0).toLocaleString()}</td>
-                    <td className="px-6 py-4 text-right text-orange-600 font-medium">₹{Number(booking.pending_amount || 0).toLocaleString()}</td>
-                    <td className="px-6 py-4 text-center">
-                      {Number(booking.pending_amount || 0) > 0 && booking.payment_mode === 'PARTIAL_PAYMENT' ? (
-                        <button
-                          onClick={() => handlePayBalance(booking)}
-                          disabled={loading}
-                          className="px-3 py-1.5 bg-orange-100 text-orange-700 hover:bg-orange-200 rounded-lg text-xs font-medium transition-colors"
-                        >
-                          Pay Balance
-                        </button>
-                      ) : (
-                        <span className="text-slate-400 text-xs">Settled</span>
-                      )}
+                {orders.map((order) => (
+                  <tr key={order.id}>
+                    <td className="px-6 py-4 font-medium text-slate-800">{order.booking_reference}</td>
+                    <td className="px-6 py-4 text-slate-600">{order.hotel_name}</td>
+                    <td className="px-6 py-4 text-slate-600">{order.check_in}</td>
+                    <td className="px-6 py-4 text-slate-600">{order.check_out}</td>
+                    <td className="px-6 py-4 text-slate-600">{order.booking_mode} ({order.total_rooms} Rooms)</td>
+                    <td className="px-6 py-4 text-slate-600">
+                      <span className={`px-2 py-1 rounded text-xs font-bold ${order.status === 'CONFIRMED' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-700'}`}>
+                        {order.status}
+                      </span>
                     </td>
+                    <td className="px-6 py-4 text-right font-medium text-slate-800">₹{parseFloat(order.b2b_selling_total).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
@@ -191,11 +129,11 @@ export default function BookingsPage() {
         {message && <div className="mb-6 rounded-xl border border-green-100 bg-green-50 p-4 text-green-700">{message}</div>}
         {error && <div className="mb-6 rounded-xl border border-red-100 bg-red-50 p-4 text-red-700">{error}</div>}
         <form onSubmit={handleUpload} className="max-w-lg space-y-5">
-          <label className="block text-sm font-medium text-slate-700">Booking<select className="mt-1 block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" value={bookingId} onChange={(event) => setBookingId(event.target.value)} required><option value="">Select a booking</option>{bookings.map((booking) => <option key={booking.id} value={booking.id}>{booking.booking_reference || `Booking #${booking.id}`}</option>)}</select></label>
+          <label className="block text-sm font-medium text-slate-700">Booking Reference<select className="mt-1 block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" value={bookingRef} onChange={(event) => setBookingRef(event.target.value)} required><option value="">Select a booking</option>{orders.map((order) => <option key={order.booking_reference} value={order.booking_reference}>{order.booking_reference}</option>)}</select></label>
           <label className="block text-sm font-medium text-slate-700">Traveller name<input className="mt-1 block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" value={travellerName} onChange={(event) => setTravellerName(event.target.value)} required /></label>
           <label className="block text-sm font-medium text-slate-700">Aadhaar number<input inputMode="numeric" pattern="[0-9]{12}" maxLength={12} className="mt-1 block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" value={aadhaarNumber} onChange={(event) => setAadhaarNumber(event.target.value.replace(/\D/g, ''))} required /></label>
           <label className="block text-sm font-medium text-slate-700">Aadhaar front image<input type="file" className="mt-1 block w-full rounded-xl border border-slate-200 bg-slate-50 p-3" onChange={(event) => setFile(event.target.files?.[0] || null)} accept="image/jpeg,image/png" required /></label>
-          <button type="submit" disabled={loading || !file || !bookingId} className="w-full rounded-xl bg-orange-500 px-4 py-3.5 font-medium text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70">{loading ? 'Uploading…' : 'Upload document'}</button>
+          <button type="submit" disabled={loading || !file || !bookingRef} className="w-full rounded-xl bg-orange-500 px-4 py-3.5 font-medium text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70">{loading ? 'Uploading…' : 'Upload document'}</button>
         </form>
       </section>
     </div>

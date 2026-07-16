@@ -175,7 +175,7 @@ export const HotelCard = memo(function HotelCard({
             onClick={() => onBook(hotel)}
             className="flex-1 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-bold text-lg flex items-center justify-center py-3 shadow-lg shadow-orange-500/30 transition-all transform hover:-translate-y-0.5 active:translate-y-0 active:shadow-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
           >
-            Book Now
+            Select Rooms
           </button>
         </div>
       </div>

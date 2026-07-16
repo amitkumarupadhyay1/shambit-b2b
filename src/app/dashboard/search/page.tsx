@@ -168,43 +168,15 @@ function SearchContent() {
 
   const proceedToCheckout = async (hotel: HotelResult) => {
     if (!checkIn || !checkOut) {
-      toast.error("Please select check-in and check-out dates before booking.");
-      return;
-    }
-    const roomId = hotel.rooms?.[0]?.id;
-    if (!roomId || !hotel.b2b_pricing) {
-      toast.error('This hotel does not have a live B2B rate available. Please search again.');
+      toast.error("Please select check-in and check-out dates.");
       return;
     }
 
-    const toastId = toast.loading('Securing inventory hold for 15 minutes...');
-
-    try {
-      const response = await api.post('/b2b/initiate-checkout/', {
-        hotel_id: hotel.id,
-        room_id: roomId,
-        check_in: checkIn,
-        check_out: checkOut,
-        num_rooms: 1,
-        adults: adults,
-      });
-
-      toast.success('Inventory secured!', { id: toastId });
-      const bookingId = response.data.hotel_booking_id || response.data.booking_id;
-
-      const params = new URLSearchParams({
-        hotel_booking_id: String(bookingId),
-        base_price: hotel.b2b_pricing.base_price,
-        net_rate: hotel.b2b_pricing.net_rate,
-        tac_amount: hotel.b2b_pricing.tac_amount,
-      });
-      router.push(`/dashboard/checkout?${params.toString()}`);
-    } catch (e: unknown) {
-      console.error(e);
-      const err = e as { response?: { data?: { error?: string } } };
-      const errorMsg = err.response?.data?.error || 'Could not hold inventory. Room may be sold out.';
-      toast.error(errorMsg, { id: toastId });
-    }
+    const params = new URLSearchParams({
+      checkIn: checkIn,
+      checkOut: checkOut,
+    });
+    router.push(`/dashboard/hotel/${hotel.id}?${params.toString()}`);
   };
 
   return (
