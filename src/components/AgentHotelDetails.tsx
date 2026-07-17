@@ -5,7 +5,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import api from '../lib/api';
 import { ImageWithFallback } from './ImageWithFallback';
-import { MapPin, Plus, Minus, ArrowRight, Loader2 } from 'lucide-react';
+import { MapPin, ArrowRight, Loader2 } from 'lucide-react';
+import RoomWiseBookingWidget from './b2b/RoomWiseBookingWidget';
+import GlobalBookingWidget from './b2b/GlobalBookingWidget';
+import B2BPriceBreakdown from './b2b/B2BPriceBreakdown';
 
 interface HotelDetails {
   id: number;
@@ -19,16 +22,26 @@ interface HotelDetails {
     description: string;
     max_adults: number;
     base_price_per_night: string;
+    available_rooms: number;
     images: { image_url: string }[];
-    b2b_pricing_matrix: { b2b_base: string; agent_tac_amount: string } | null;
+    b2b_pricing_matrix: {
+      id: string;
+      room_type: string;
+      meal_plan: string;
+      is_sub_row: boolean;
+      b2c_price: number;
+      agent_tac: number;
+      final_b2b_selling: number;
+    }[];
   }[];
   global_rate_plans: {
     id: number;
     name: string;
-    hotel_net_rate_per_room_per_night: string;
+    rate_per_room_per_night: string;
     min_rooms: number;
-    max_rooms: number;
+    max_rooms: number | null;
     allocation_mode: string;
+    terms_and_conditions?: string;
   }[];
 }
 
@@ -43,14 +56,17 @@ interface QuoteLine {
 }
 
 interface QuoteResult {
+  quote_id: string;
   booking_mode: string;
   summary: {
     b2c_total: string;
-    hotel_net_total: string;
     agent_tac_total: string;
     b2b_selling_total: string;
   };
   lines: QuoteLine[];
+  allocation_mode?: string;
+  requires_confirmation?: boolean;
+  warnings?: string[];
 }
 
 interface QuotePayload {
@@ -68,8 +84,10 @@ export default function AgentHotelDetails({ hotelId }: { hotelId: number }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const initialCheckIn = searchParams.get('checkIn') || '';
-  const initialCheckOut = searchParams.get('checkOut') || '';
+  const initialCheckIn = searchParams.get('check_in') || searchParams.get('checkIn') || '';
+  const initialCheckOut = searchParams.get('check_out') || searchParams.get('checkOut') || '';
+  const requestedAdults = Number(searchParams.get('adults') || 1);
+  const initialAdults = Number.isFinite(requestedAdults) ? Math.max(1, requestedAdults) : 1;
   
   const [loading, setLoading] = useState(true);
   const [hotel, setHotel] = useState<HotelDetails | null>(null);
@@ -77,6 +95,7 @@ export default function AgentHotelDetails({ hotelId }: { hotelId: number }) {
   
   const [checkIn, setCheckIn] = useState(initialCheckIn);
   const [checkOut, setCheckOut] = useState(initialCheckOut);
+  const [roomWiseAdults, setRoomWiseAdults] = useState(initialAdults);
   
   // Room-wise selection state
   const [roomSelections, setRoomSelections] = useState<Record<number, number>>({});
@@ -91,20 +110,29 @@ export default function AgentHotelDetails({ hotelId }: { hotelId: number }) {
   const [quoteResult, setQuoteResult] = useState<QuoteResult | null>(null);
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchHotel = async () => {
       try {
-        const res = await api.get(`/b2b/hotels/${hotelId}/`);
+        setLoading(true);
+        const res = await api.get(`/b2b/hotels/${hotelId}/`, {
+          params: { check_in: checkIn || undefined, check_out: checkOut || undefined, adults: roomWiseAdults },
+          signal: controller.signal,
+        });
         setHotel(res.data);
-      } catch {
-        toast.error('Failed to load hotel details');
+      } catch (error: unknown) {
+        if (controller.signal.aborted) return;
+        const responseError = error as { response?: { data?: { error?: string } } };
+        toast.error(responseError.response?.data?.error || 'Failed to load hotel details', { id: 'hotel-detail-error' });
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
     fetchHotel();
-  }, [hotelId]);
+    return () => controller.abort();
+  }, [hotelId, checkIn, checkOut, roomWiseAdults]);
 
   const handleUpdateRoomQty = (roomId: number, qty: number) => {
+    setQuoteResult(null);
     setRoomSelections(prev => ({
       ...prev,
       [roomId]: Math.max(0, qty)
@@ -130,7 +158,7 @@ export default function AgentHotelDetails({ hotelId }: { hotelId: number }) {
         .map(([roomId, qty]) => ({
           room_type_id: parseInt(roomId),
           quantity: qty,
-          adults: 2 // default or we can add UI for per room adults
+          adults: roomWiseAdults
         }));
       
       if (rooms.length === 0) {
@@ -138,6 +166,7 @@ export default function AgentHotelDetails({ hotelId }: { hotelId: number }) {
         return;
       }
       payload.rooms = rooms;
+      payload.total_guests = roomWiseAdults;
     } else {
       if (!selectedGlobalPlanId) {
         toast.error('Please select a global rate plan.');
@@ -163,33 +192,14 @@ export default function AgentHotelDetails({ hotelId }: { hotelId: number }) {
   };
 
   const proceedToReservation = async () => {
-    if (!checkIn || !checkOut) return;
-
-    const payload: QuotePayload = {
-      hotel_id: hotelId,
-      check_in: checkIn,
-      check_out: checkOut,
-      booking_mode: bookingMode,
-    };
-
-    if (bookingMode === 'ROOM_WISE') {
-      const rooms = Object.entries(roomSelections)
-        .filter(([, qty]) => qty > 0)
-        .map(([roomId, qty]) => ({
-          room_type_id: parseInt(roomId),
-          quantity: qty,
-          adults: 2
-        }));
-      payload.rooms = rooms;
-    } else {
-      payload.global_rate_plan_id = selectedGlobalPlanId || undefined;
-      payload.total_rooms = globalTotalRooms;
-      payload.total_guests = globalTotalGuests;
+    if (!quoteResult?.quote_id) {
+      toast.error('Please update the quote before reserving.');
+      return;
     }
 
     const tid = toast.loading('Holding inventory...');
     try {
-      const res = await api.post('/b2b/reservations/', payload);
+      const res = await api.post('/b2b/reservations/', { quote_id: quoteResult.quote_id });
       toast.success('Reservation created!', { id: tid });
       router.push(`/dashboard/checkout?reference=${res.data.booking_reference}`);
     } catch (err: unknown) {
@@ -217,6 +227,10 @@ export default function AgentHotelDetails({ hotelId }: { hotelId: number }) {
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase">Check In</label>
               <input type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)} className="w-full mt-1 p-2 border rounded-lg" />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs font-bold text-slate-500 uppercase">Total adults</label>
+              <input type="number" min={1} value={roomWiseAdults} onChange={e => { const value = Number(e.target.value); setRoomWiseAdults(Number.isFinite(value) ? Math.max(1, value) : 1); setQuoteResult(null); }} className="w-full mt-1 p-2 border rounded-lg" />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase">Check Out</label>
@@ -249,75 +263,23 @@ export default function AgentHotelDetails({ hotelId }: { hotelId: number }) {
         <div className="lg:col-span-2 space-y-6">
           {bookingMode === 'ROOM_WISE' ? (
             <div className="space-y-4">
-              {hotel.rooms.map(room => (
-                <div key={room.id} className="bg-white rounded-2xl p-4 border border-slate-200 flex gap-4">
-                  <div className="w-32 h-32 relative rounded-lg overflow-hidden shrink-0 bg-slate-100">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    {room.images[0]?.image_url && <img src={room.images[0].image_url} alt={room.name} className="w-full h-full object-cover" />}
-                  </div>
-                  <div className="flex-1 flex flex-col justify-between">
-                    <div>
-                      <h3 className="font-bold text-lg">{room.name}</h3>
-                      <p className="text-xs text-slate-500 max-w-sm line-clamp-2">{room.description}</p>
-                    </div>
-                    {room.b2b_pricing_matrix ? (
-                      <div className="mt-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900">B2B Base:</span> ₹{parseFloat(room.b2b_pricing_matrix.b2b_base).toLocaleString()}
-                        </div>
-                        <div className="text-xs text-emerald-600 font-semibold">+ ₹{parseFloat(room.b2b_pricing_matrix.agent_tac_amount).toLocaleString()} TAC</div>
-                      </div>
-                    ) : (
-                      <div className="mt-2 text-sm text-red-500 font-semibold">Not included in contract</div>
-                    )}
-                  </div>
-                  <div className="w-32 flex flex-col items-center justify-center border-l pl-4">
-                    <label className="text-xs font-bold text-slate-500 mb-2">Quantity</label>
-                    <div className="flex items-center gap-3">
-                      <button onClick={() => handleUpdateRoomQty(room.id, (roomSelections[room.id] || 0) - 1)} className="p-1 border rounded hover:bg-slate-50"><Minus className="w-4 h-4"/></button>
-                      <span className="font-bold">{roomSelections[room.id] || 0}</span>
-                      <button onClick={() => handleUpdateRoomQty(room.id, (roomSelections[room.id] || 0) + 1)} className="p-1 border rounded hover:bg-slate-50"><Plus className="w-4 h-4"/></button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+              <RoomWiseBookingWidget 
+                rooms={hotel.rooms}
+                roomSelections={roomSelections}
+                onUpdateQuantity={handleUpdateRoomQty}
+              />
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="bg-white rounded-2xl p-6 border border-slate-200 space-y-6">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Select Global Rate Plan</label>
-                  <select 
-                    className="w-full p-3 border rounded-xl"
-                    value={selectedGlobalPlanId || ''}
-                    onChange={e => setSelectedGlobalPlanId(Number(e.target.value))}
-                  >
-                    <option value="">-- Select a Plan --</option>
-                    {hotel.global_rate_plans.map(plan => (
-                      <option key={plan.id} value={plan.id}>{plan.name} (Min {plan.min_rooms} rooms)</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Total Rooms Needed</label>
-                    <div className="flex items-center gap-3 border rounded-xl p-2 w-fit">
-                      <button onClick={() => setGlobalTotalRooms(Math.max(1, globalTotalRooms - 1))} className="p-2 hover:bg-slate-50 rounded"><Minus className="w-4 h-4"/></button>
-                      <span className="font-bold w-8 text-center">{globalTotalRooms}</span>
-                      <button onClick={() => setGlobalTotalRooms(globalTotalRooms + 1)} className="p-2 hover:bg-slate-50 rounded"><Plus className="w-4 h-4"/></button>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Total Guests</label>
-                    <div className="flex items-center gap-3 border rounded-xl p-2 w-fit">
-                      <button onClick={() => setGlobalTotalGuests(Math.max(1, globalTotalGuests - 1))} className="p-2 hover:bg-slate-50 rounded"><Minus className="w-4 h-4"/></button>
-                      <span className="font-bold w-8 text-center">{globalTotalGuests}</span>
-                      <button onClick={() => setGlobalTotalGuests(globalTotalGuests + 1)} className="p-2 hover:bg-slate-50 rounded"><Plus className="w-4 h-4"/></button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <GlobalBookingWidget
+                plans={hotel.global_rate_plans}
+                selectedPlanId={selectedGlobalPlanId}
+                onSelectPlan={setSelectedGlobalPlanId}
+                totalRooms={globalTotalRooms}
+                onUpdateTotalRooms={setGlobalTotalRooms}
+                totalGuests={globalTotalGuests}
+                onUpdateTotalGuests={setGlobalTotalGuests}
+              />
             </div>
           )}
         </div>
@@ -339,36 +301,13 @@ export default function AgentHotelDetails({ hotelId }: { hotelId: number }) {
             <div className="p-6 flex-1 flex flex-col">
               {quoteResult ? (
                 <div className="space-y-4 text-sm">
-                  <div className="space-y-2 border-b pb-4">
-                    {quoteResult.lines.map((line, idx) => (
-                      <div key={idx} className="flex justify-between">
-                        <span className="text-slate-600">{line.quantity}x {line.room_type_name || 'Global Allocation'}</span>
-                        <span className="font-semibold">₹{parseFloat(line.pricing.b2c_total || line.pricing.final_b2b_selling_total || '0').toLocaleString()}</span>
+                    <B2BPriceBreakdown quoteResult={quoteResult} />
+                    {quoteResult.requires_confirmation && (
+                      <div className="rounded-xl border border-purple-200 bg-purple-50 p-3 text-sm text-purple-800">
+                        <p className="font-bold">Pending hotel allocation after checkout</p>
+                        {(quoteResult.warnings || []).map((warning) => <p key={warning} className="mt-1">{warning}</p>)}
                       </div>
-                    ))}
-                  </div>
-                  
-                  <div className="space-y-2 pb-4">
-                    <div className="flex justify-between text-slate-600">
-                      <span>Public Selling Total (B2C)</span>
-                      <span>₹{parseFloat(quoteResult.summary.b2c_total).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between text-slate-600">
-                      <span>Net B2B Price</span>
-                      <span>₹{parseFloat(quoteResult.summary.hotel_net_total).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between text-emerald-600 font-bold bg-emerald-50 p-2 rounded">
-                      <span>Your TAC (Commission)</span>
-                      <span>+ ₹{parseFloat(quoteResult.summary.agent_tac_total).toLocaleString()}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="pt-4 border-t border-dashed mt-auto">
-                    <div className="flex justify-between items-end">
-                      <span className="font-bold text-lg">Amount Payable</span>
-                      <span className="text-2xl font-black text-slate-900">₹{parseFloat(quoteResult.summary.b2b_selling_total).toLocaleString()}</span>
-                    </div>
-                  </div>
+                    )}
                   
                   <button 
                     onClick={proceedToReservation}

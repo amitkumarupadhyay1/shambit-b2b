@@ -2,8 +2,14 @@
 
 import { useState, Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Script from 'next/script';
 import api from '../../../lib/api';
 import { Info, ChevronDown, ChevronUp } from 'lucide-react';
+import B2BBookingSummary from '../../../components/b2b/B2BBookingSummary';
+import type {
+  RazorpayErrorResponse,
+  RazorpayResponse,
+} from '../../../components/common/RazorpayPaymentHandler';
 
 
 interface VipRequest {
@@ -40,6 +46,7 @@ interface OrderLine {
 }
 
 interface OrderData {
+  status: string;
   hotel_name: string;
   check_in: string;
   check_out: string;
@@ -49,11 +56,21 @@ interface OrderData {
   lines: OrderLine[];
   pricing_snapshot: {
     b2c_total: string;
-    hotel_net_total: string;
+    b2b_selling_total: string;
     agent_tac_total: string;
-    net_rate: string;
   };
 }
+
+interface OnlinePaymentOrder {
+  razorpay_key_id: string;
+  razorpay_order_id: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+}
+
+type PaymentMode = 'LEDGER_HOLD' | 'PREPAID';
 
 function CheckoutContent() {
   const router = useRouter();
@@ -76,8 +93,10 @@ function CheckoutContent() {
   const [preferredFloor, setPreferredFloor] = useState('any');
   
   const [showLedgerDetails, setShowLedgerDetails] = useState(false);
-  const [paymentMode, setPaymentMode] = useState('LEDGER_HOLD');
-  const [customAmount, setCustomAmount] = useState<string>('');
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('LEDGER_HOLD');
+  const [razorpayReady, setRazorpayReady] = useState(
+    () => typeof window !== 'undefined' && !!window.Razorpay,
+  );
   
 
 
@@ -110,24 +129,6 @@ function CheckoutContent() {
     setLoading(true);
     setError('');
 
-    let amountToPay = 0;
-    if (paymentMode === 'PARTIAL_PAYMENT' && pricing) {
-      amountToPay = Number(customAmount);
-      const minRequired = Number(pricing.hotel_net_total) * 0.25;
-      if (amountToPay < minRequired) {
-        setError(`Minimum payment required is 25% (₹${minRequired.toFixed(2)})`);
-        setLoading(false);
-        return;
-      }
-      if (amountToPay > Number(pricing.hotel_net_total)) {
-        setError(`Payment cannot exceed total amount (₹${pricing.hotel_net_total})`);
-        setLoading(false);
-        return;
-      }
-    } else if (paymentMode === 'FULL_PAYMENT' && pricing) {
-      amountToPay = Number(pricing.hotel_net_total);
-    }
-    
     try {
       const payload: CheckoutPayload = {
         primary_guest_name: primaryGuest,
@@ -136,7 +137,7 @@ function CheckoutContent() {
         special_requests: specialRequests,
         floor_preference: preferredFloor === "high",
         kitchen_dining_requested: false,
-        payment_mode: paymentMode === 'LEDGER_HOLD' ? 'LEDGER_HOLD' : 'PARTIAL_PAYMENT',
+        payment_mode: paymentMode,
         vip_requests: vipDarshan ? [{
           temple_name: "Local Temple",
           darshan_date: orderData?.check_in || "",
@@ -150,29 +151,94 @@ function CheckoutContent() {
         }] : []
       };
 
+      if (paymentMode === 'PREPAID') {
+        if (!razorpayReady || !window.Razorpay) {
+          throw new Error('Secure payment window is still loading. Please try again.');
+        }
+        const initiation = await api.post<OnlinePaymentOrder>(
+          `/b2b/orders/${reference}/payments/initiate/`,
+          payload,
+        );
+        const paymentOrder = initiation.data;
+        const razorpay = new window.Razorpay({
+          key: paymentOrder.razorpay_key_id,
+          amount: paymentOrder.amount,
+          currency: paymentOrder.currency,
+          name: paymentOrder.name,
+          description: paymentOrder.description,
+          order_id: paymentOrder.razorpay_order_id,
+          prefill: {
+            name: primaryGuest,
+            email: contactEmail,
+            contact: contactPhone,
+          },
+          handler: async (paymentResponse: RazorpayResponse) => {
+            setLoading(true);
+            setError('');
+            try {
+              const verification = await api.post(
+                `/b2b/orders/${reference}/payments/verify/`,
+                paymentResponse,
+              );
+              const isPending = verification.status === 202;
+              setSuccess(
+                isPending
+                  ? 'Payment received and awaiting final gateway confirmation.'
+                  : verification.data.requires_confirmation
+                    ? `Payment successful. Request submitted for hotel allocation. Reference: ${verification.data.booking_reference}`
+                    : `Payment successful. Booking confirmed. Reference: ${verification.data.booking_reference}`,
+              );
+              setTimeout(() => {
+                router.push(`/dashboard/bookings/${reference}`);
+              }, 1500);
+            } catch (verifyError: unknown) {
+              const typedError = verifyError as { response?: { data?: { error?: string } } };
+              setError(
+                typedError.response?.data?.error
+                  || 'Payment was received but confirmation is still processing. Check booking status before retrying.',
+              );
+            } finally {
+              setLoading(false);
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              setLoading(false);
+              setError('Payment window closed. Your room hold remains active until its expiry time.');
+            },
+          },
+        });
+        razorpay.on('payment.failed', (failure: RazorpayErrorResponse) => {
+          setLoading(false);
+          setError(failure.error.description || 'Online payment failed. Please try again.');
+        });
+        razorpay.open();
+        setLoading(false);
+        return;
+      }
+
       const response = await api.post(`/b2b/reservations/${reference}/checkout/`, payload);
       
-      if (response.data.status === 'success') {
-        if (paymentMode === 'LEDGER_HOLD') {
-          setSuccess(`Booking confirmed. Reference: ${response.data.booking_reference}`);
-          setTimeout(() => {
-            router.push('/dashboard/bookings');
-          }, 3000);
-        } else {
-           setError('Online payment flow is not fully implemented in the new phase yet. Please use Ledger Hold.');
-           setLoading(false);
-           // Fallback to Razorpay if it was integrated properly with parent order.
-        }
+        if (response.data.status === 'success') {
+          setSuccess(
+            response.data.requires_confirmation
+              ? `Request submitted for hotel allocation. Reference: ${response.data.booking_reference}`
+              : `Booking confirmed. Reference: ${response.data.booking_reference}`,
+          );
+        setTimeout(() => {
+          router.push(`/dashboard/bookings/${response.data.booking_reference}`);
+        }, 1500);
       } else {
         setError(response.data.error || 'Checkout failed');
       }
-    } catch (err) {
+    } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'An error occurred during checkout.');
+      setError(
+        error.response?.data?.error
+          || (err instanceof Error ? err.message : 'An error occurred during checkout.'),
+      );
     } finally {
-      if (paymentMode === 'LEDGER_HOLD') {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   };
 
@@ -186,6 +252,15 @@ function CheckoutContent() {
 
   return (
     <div className="space-y-6">
+      <Script
+        src="https://checkout.razorpay.com/v1/checkout.js"
+        strategy="afterInteractive"
+        onReady={() => setRazorpayReady(true)}
+        onError={() => {
+          setRazorpayReady(false);
+          setError('Secure online payment could not be loaded. Ledger payment remains available.');
+        }}
+      />
       <h1 className="text-2xl font-bold text-slate-900 font-playfair">Complete B2B Booking</h1>
       
       {success && <div className="p-4 rounded-xl bg-green-50 text-green-700 border border-green-100">{success}</div>}
@@ -290,70 +365,40 @@ function CheckoutContent() {
               <>
                 <h2 className="text-lg font-semibold text-slate-800 mb-4 border-b border-slate-100 pb-2 mt-8">Payment Method</h2>
                 <div className="space-y-4 mb-8">
-                  <label className="flex items-start p-4 border border-slate-200 rounded-xl cursor-pointer hover:border-orange-300 transition-colors bg-white">
+                  <label className={`flex items-start p-4 border rounded-xl cursor-pointer ${paymentMode === 'LEDGER_HOLD' ? 'border-orange-400 bg-orange-50' : 'border-slate-200 bg-white'}`}>
                     <div className="flex items-center h-5">
                       <input 
                         type="radio" 
                         name="payment_mode"
                         value="LEDGER_HOLD"
                         checked={paymentMode === 'LEDGER_HOLD'}
-                        onChange={(e) => setPaymentMode(e.target.value)}
+                        onChange={() => setPaymentMode('LEDGER_HOLD')}
                         className="focus:ring-orange-500 h-4 w-4 text-orange-600 border-gray-300"
                       />
                     </div>
                     <div className="ml-3">
                       <span className="font-medium text-slate-800 block">Ledger Hold</span>
-                      <span className="text-sm text-slate-500">Deduct ₹{parseFloat(pricing.hotel_net_total).toLocaleString()} from your B2B credit limit.</span>
+                      <span className="text-sm text-slate-500">Hold ₹{parseFloat(pricing.b2b_selling_total).toLocaleString()} against your B2B credit limit.</span>
                     </div>
                   </label>
-                  
-                  <label className="flex items-start p-4 border border-slate-200 rounded-xl cursor-pointer hover:border-orange-300 transition-colors bg-white">
+                  <label className={`flex items-start p-4 border rounded-xl cursor-pointer ${paymentMode === 'PREPAID' ? 'border-orange-400 bg-orange-50' : 'border-slate-200 bg-white'}`}>
                     <div className="flex items-center h-5">
-                      <input 
-                        type="radio" 
+                      <input
+                        type="radio"
                         name="payment_mode"
-                        value="FULL_PAYMENT"
-                        checked={paymentMode === 'FULL_PAYMENT'}
-                        onChange={(e) => setPaymentMode(e.target.value)}
+                        value="PREPAID"
+                        checked={paymentMode === 'PREPAID'}
+                        onChange={() => setPaymentMode('PREPAID')}
                         className="focus:ring-orange-500 h-4 w-4 text-orange-600 border-gray-300"
                       />
                     </div>
                     <div className="ml-3">
-                      <span className="font-medium text-slate-800 block">Online Payment (Full)</span>
-                      <span className="text-sm text-slate-500">Pay the full amount (₹{parseFloat(pricing.hotel_net_total).toLocaleString()}) securely via Razorpay.</span>
-                    </div>
-                  </label>
-
-                  <label className="flex items-start p-4 border border-slate-200 rounded-xl cursor-pointer hover:border-orange-300 transition-colors bg-white">
-                    <div className="flex items-center h-5">
-                      <input 
-                        type="radio" 
-                        name="payment_mode"
-                        value="PARTIAL_PAYMENT"
-                        checked={paymentMode === 'PARTIAL_PAYMENT'}
-                        onChange={(e) => {
-                          setPaymentMode(e.target.value);
-                          setCustomAmount((Number(pricing.net_rate) * 0.25).toFixed(2));
-                        }}
-                        className="focus:ring-orange-500 h-4 w-4 text-orange-600 border-gray-300"
-                      />
-                    </div>
-                    <div className="ml-3 w-full">
-                      <span className="font-medium text-slate-800 block">Online Payment (Partial)</span>
-                      <span className="text-sm text-slate-500 block mb-3">Pay a minimum 25% (₹{(Number(pricing.hotel_net_total) * 0.25).toFixed(2)}) now to confirm, balance later.</span>
-                      {paymentMode === 'PARTIAL_PAYMENT' && (
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="text-sm font-medium text-slate-600">₹</span>
-                          <input 
-                            type="number"
-                            min={Number(pricing.hotel_net_total) * 0.25}
-                            max={Number(pricing.hotel_net_total)}
-                            step="0.01"
-                            value={customAmount}
-                            onChange={(e) => setCustomAmount(e.target.value)}
-                            className="block w-full max-w-[200px] px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-                          />
-                        </div>
+                      <span className="font-medium text-slate-800 block">Pay Online</span>
+                      <span className="text-sm text-slate-500">
+                        Pay ₹{parseFloat(pricing.b2b_selling_total).toLocaleString()} securely using Razorpay.
+                      </span>
+                      {!razorpayReady && (
+                        <span className="text-xs text-amber-700 block mt-1">Secure payment window is loading…</span>
                       )}
                     </div>
                   </label>
@@ -365,9 +410,18 @@ function CheckoutContent() {
               <button 
                 type="submit" 
                 className="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-orange-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-all disabled:opacity-70 disabled:cursor-not-allowed transform hover:-translate-y-0.5" 
-                disabled={loading || !!success || !pricing}
+                disabled={
+                  loading
+                  || !!success
+                  || !pricing
+                  || (paymentMode === 'PREPAID' && !razorpayReady)
+                }
               >
-                {loading ? 'Processing...' : 'Confirm Booking via Ledger'}
+                {loading
+                  ? 'Processing...'
+                  : paymentMode === 'PREPAID'
+                    ? 'Pay Securely & Confirm'
+                    : 'Confirm Booking via Ledger'}
               </button>
             </div>
           </form>
@@ -375,32 +429,7 @@ function CheckoutContent() {
         
         <div className="w-full lg:w-80 flex-shrink-0">
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm sticky top-6">
-            <h3 className="font-semibold text-slate-900 mb-4 text-lg border-b border-slate-100 pb-2">Booking Summary</h3>
-            <div className="space-y-3 mb-6">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-500">Hotel</span>
-                <strong className="text-slate-800">{orderData?.hotel_name}</strong>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-500">Check In</span>
-                <strong className="text-slate-800">{orderData?.check_in}</strong>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-500">Check Out</span>
-                <strong className="text-slate-800">{orderData?.check_out}</strong>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-500">Guests & Rooms</span>
-                <strong className="text-slate-800">{orderData?.total_guests} Guests, {orderData?.total_rooms} Rooms</strong>
-              </div>
-              
-              {orderData?.lines.map((line) => (
-                <div key={line.id} className="flex justify-between items-center text-xs text-slate-600 pl-2 border-l-2 border-slate-200">
-                  <span>{line.quantity}x {line.room_type_name || (line.line_type === 'GLOBAL' ? 'Global Plan' : 'Allocation')}</span>
-                  <span>₹{parseFloat(line.total_amount).toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
+            <B2BBookingSummary orderData={orderData} />
             
             {pricing ? (
               <div className="mb-6 space-y-4">
@@ -411,9 +440,11 @@ function CheckoutContent() {
                   </div>
                   
                   <div className="flex justify-between items-center text-lg mb-4">
-                    <span className="text-slate-800 font-black">Amount to Debit</span>
+                    <span className="text-slate-800 font-black">
+                      {paymentMode === 'PREPAID' ? 'Amount Payable' : 'Amount to Debit'}
+                    </span>
                     <span className="text-slate-900 font-black">
-                      ₹{parseFloat(pricing.hotel_net_total).toLocaleString()}
+                      ₹{parseFloat(pricing.b2b_selling_total).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -434,15 +465,17 @@ function CheckoutContent() {
                     <div className="p-4 bg-white border-t border-slate-200 space-y-3">
                       <div className="flex justify-between items-end text-sm">
                         <span className="text-slate-600 font-medium">B2B Net Rate</span>
-                        <span className="text-slate-900 font-bold">₹{parseFloat(pricing.hotel_net_total).toLocaleString()}</span>
+                        <span className="text-slate-900 font-bold">₹{parseFloat(pricing.b2b_selling_total).toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between items-end text-sm">
                         <span className="text-green-600 font-medium">Your Commission (TAC)</span>
                         <span className="text-green-700 font-bold">₹{parseFloat(pricing.agent_tac_total).toLocaleString()}</span>
                       </div>
                       <div className="pt-2 mt-2 border-t border-slate-100 flex justify-between items-end bg-red-50 p-2 rounded-lg mt-4">
-                        <span className="text-slate-800 font-black text-sm">Amount to Debit</span>
-                        <span className="text-red-600 font-black text-lg">₹{parseFloat(pricing.hotel_net_total).toLocaleString()}</span>
+                        <span className="text-slate-800 font-black text-sm">
+                          {paymentMode === 'PREPAID' ? 'Amount Payable' : 'Amount to Debit'}
+                        </span>
+                        <span className="text-red-600 font-black text-lg">₹{parseFloat(pricing.b2b_selling_total).toLocaleString()}</span>
                       </div>
                     </div>
                   )}
@@ -459,7 +492,9 @@ function CheckoutContent() {
             <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-start gap-3">
               <Info className="text-blue-500 w-5 h-5 flex-shrink-0 mt-0.5" />
               <p className="text-xs text-blue-700 leading-relaxed">
-                Payment will be automatically held against your B2B Ledger credit limit.
+                {paymentMode === 'PREPAID'
+                  ? 'The amount is calculated by the server. Your booking is confirmed only after payment verification.'
+                  : 'Payment will be automatically held against your B2B Ledger credit limit.'}
               </p>
             </div>
           </div>

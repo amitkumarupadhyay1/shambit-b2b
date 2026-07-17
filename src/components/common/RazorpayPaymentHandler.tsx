@@ -56,7 +56,7 @@ export function useRazorpay() {
     document.body.appendChild(script);
 
     return () => {
-      document.body.removeChild(script);
+      script.remove();
     };
   }, []);
 
@@ -66,8 +66,10 @@ export function useRazorpay() {
       return;
     }
     
-    // Fallback key if not provided by backend
-    const key = options.key || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_fallback';
+    const key = options.key || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+    if (!key) {
+      throw new Error('Razorpay key is not configured.');
+    }
     
     const rzp = new window.Razorpay({
       ...options,

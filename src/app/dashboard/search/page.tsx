@@ -40,8 +40,8 @@ function SearchContent() {
   const [today] = useState(() => new Date().toISOString().split('T')[0]);
   const [tomorrow] = useState(() => new Date(Date.now() + 86400000).toISOString().split('T')[0]);
   
-  const [checkIn, setCheckIn] = useState(searchParams.get('checkIn') || today);
-  const [checkOut, setCheckOut] = useState(searchParams.get('checkOut') || tomorrow);
+  const [checkIn, setCheckIn] = useState(searchParams.get('check_in') || today);
+  const [checkOut, setCheckOut] = useState(searchParams.get('check_out') || tomorrow);
   const [adults, setAdults] = useState(initialAdults);
   
   // Filters
@@ -58,8 +58,8 @@ function SearchContent() {
   const updateUrlParams = useCallback(() => {
     const params = new URLSearchParams(searchParams.toString());
     if (selectedCityName) params.set('city', selectedCityName);
-    params.set('checkIn', checkIn);
-    params.set('checkOut', checkOut);
+    params.set('check_in', checkIn);
+    params.set('check_out', checkOut);
     params.set('adults', adults.toString());
     
     if (selectedStars.length) params.set('stars', selectedStars.join(','));
@@ -173,8 +173,8 @@ function SearchContent() {
     }
 
     const params = new URLSearchParams({
-      checkIn: checkIn,
-      checkOut: checkOut,
+      check_in: checkIn,
+      check_out: checkOut,
     });
     router.push(`/dashboard/hotel/${hotel.id}?${params.toString()}`);
   };

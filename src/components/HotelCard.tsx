@@ -24,6 +24,8 @@ export interface HotelResult {
     net_rate: string;
     tac_amount: string;
   };
+  has_room_wise_availability?: boolean;
+  has_global_availability?: boolean;
 }
 
 const generateSlug = (id: number, name: string) => {
@@ -137,6 +139,16 @@ export const HotelCard = memo(function HotelCard({
           <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-50 border border-blue-200 px-2 py-1 rounded-md">
             B2B Exclusive Rate
           </span>
+          {hotel.has_room_wise_availability && (
+            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 bg-purple-50 border border-purple-200 px-2 py-1 rounded-md">
+              Room-wise
+            </span>
+          )}
+          {hotel.has_global_availability && (
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-md">
+              Global
+            </span>
+          )}
         </div>
 
         {/* Net Rate & Pricing */}
@@ -175,7 +187,7 @@ export const HotelCard = memo(function HotelCard({
             onClick={() => onBook(hotel)}
             className="flex-1 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-bold text-lg flex items-center justify-center py-3 shadow-lg shadow-orange-500/30 transition-all transform hover:-translate-y-0.5 active:translate-y-0 active:shadow-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
           >
-            Select Rooms
+            View Rates & Book
           </button>
         </div>
       </div>

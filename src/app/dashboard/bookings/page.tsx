@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import api from '../../../lib/api';
 
 interface B2BOrder {
@@ -10,6 +11,8 @@ interface B2BOrder {
   check_in: string;
   check_out: string;
   status: string;
+  allocation_status?: string;
+  payment_status?: string;
   booking_mode: string;
   total_rooms: number;
   b2b_selling_total: string;
@@ -94,11 +97,13 @@ export default function BookingsPage() {
                 <tr>
                   <th className="px-6 py-3">Reference</th>
                   <th className="px-6 py-3">Hotel</th>
-                  <th className="px-6 py-3">Check In</th>
-                  <th className="px-6 py-3">Check Out</th>
+                  <th className="px-6 py-3">Dates</th>
                   <th className="px-6 py-3">Mode</th>
                   <th className="px-6 py-3">Status</th>
+                  <th className="px-6 py-3">Alloc. Status</th>
+                  <th className="px-6 py-3">Payment</th>
                   <th className="px-6 py-3 text-right">Total Amount</th>
+                  <th className="px-6 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -106,15 +111,27 @@ export default function BookingsPage() {
                   <tr key={order.id}>
                     <td className="px-6 py-4 font-medium text-slate-800">{order.booking_reference}</td>
                     <td className="px-6 py-4 text-slate-600">{order.hotel_name}</td>
-                    <td className="px-6 py-4 text-slate-600">{order.check_in}</td>
-                    <td className="px-6 py-4 text-slate-600">{order.check_out}</td>
+                    <td className="px-6 py-4 text-slate-600">{order.check_in} to {order.check_out}</td>
                     <td className="px-6 py-4 text-slate-600">{order.booking_mode} ({order.total_rooms} Rooms)</td>
                     <td className="px-6 py-4 text-slate-600">
                       <span className={`px-2 py-1 rounded text-xs font-bold ${order.status === 'CONFIRMED' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-700'}`}>
                         {order.status}
                       </span>
                     </td>
+                    <td className="px-6 py-4 text-slate-600">
+                      <span className="px-2 py-1 rounded text-xs font-bold bg-purple-100 text-purple-700">
+                        {order.allocation_status || 'PENDING'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-slate-600">
+                      <span className="px-2 py-1 rounded text-xs font-bold bg-amber-100 text-amber-700">
+                        {order.payment_status || 'LEDGER_HOLD'}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 text-right font-medium text-slate-800">₹{parseFloat(order.b2b_selling_total).toLocaleString()}</td>
+                    <td className="px-6 py-4 text-right">
+                      <Link href={`/dashboard/bookings/${order.booking_reference}`} className="text-orange-500 font-bold hover:underline">View details</Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>
