@@ -24,6 +24,7 @@ export default function BookingsPage() {
   const [travellerName, setTravellerName] = useState('');
   const [aadhaarNumber, setAadhaarNumber] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [consentConfirmed, setConsentConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [message, setMessage] = useState('');
@@ -48,7 +49,15 @@ export default function BookingsPage() {
 
   const handleUpload = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!file || !bookingRef || !travellerName || !aadhaarNumber) return;
+    if (!file || !bookingRef || !travellerName || !aadhaarNumber || !consentConfirmed) return;
+    if (file.size > 8 * 1024 * 1024) {
+      setError('The identity document must be 8 MB or smaller.');
+      return;
+    }
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      setError('The identity document must be a JPG or PNG image.');
+      return;
+    }
 
     setLoading(true);
     setMessage('');
@@ -59,6 +68,7 @@ export default function BookingsPage() {
     formData.append('traveller_name', travellerName);
     formData.append('aadhaar_number', aadhaarNumber);
     formData.append('aadhaar_front_image', file);
+    formData.append('consent_confirmed', 'true');
 
     try {
       const response = await api.post('/b2b/upload-document/', formData, {
@@ -70,6 +80,7 @@ export default function BookingsPage() {
         setBookingRef('');
         setTravellerName('');
         setAadhaarNumber('');
+        setConsentConfirmed(false);
       } else {
         setError(response.data.error || 'Failed to upload document.');
       }
@@ -150,7 +161,11 @@ export default function BookingsPage() {
           <label className="block text-sm font-medium text-slate-700">Traveller name<input className="mt-1 block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" value={travellerName} onChange={(event) => setTravellerName(event.target.value)} required /></label>
           <label className="block text-sm font-medium text-slate-700">Aadhaar number<input inputMode="numeric" pattern="[0-9]{12}" maxLength={12} className="mt-1 block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" value={aadhaarNumber} onChange={(event) => setAadhaarNumber(event.target.value.replace(/\D/g, ''))} required /></label>
           <label className="block text-sm font-medium text-slate-700">Aadhaar front image<input type="file" className="mt-1 block w-full rounded-xl border border-slate-200 bg-slate-50 p-3" onChange={(event) => setFile(event.target.files?.[0] || null)} accept="image/jpeg,image/png" required /></label>
-          <button type="submit" disabled={loading || !file || !bookingRef} className="w-full rounded-xl bg-orange-500 px-4 py-3.5 font-medium text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70">{loading ? 'Uploading…' : 'Upload document'}</button>
+          <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            <input type="checkbox" checked={consentConfirmed} onChange={(event) => setConsentConfirmed(event.target.checked)} className="mt-1" required />
+            <span>I confirm that the traveller has explicitly consented to this Aadhaar document being used for this booking. I understand it will be encrypted and retained in private storage according to the applicable retention policy.</span>
+          </label>
+          <button type="submit" disabled={loading || !file || !bookingRef || !consentConfirmed} className="w-full rounded-xl bg-orange-500 px-4 py-3.5 font-medium text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70">{loading ? 'Uploading…' : 'Upload document securely'}</button>
         </form>
       </section>
     </div>

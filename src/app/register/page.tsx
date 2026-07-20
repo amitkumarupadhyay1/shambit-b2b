@@ -21,6 +21,7 @@ const registerSchema = z.object({
   gst_number: z.string().regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/, "Invalid GST Number format").optional().or(z.literal("")),
   pan_number: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Invalid PAN Number format"),
   aadhaar_number: z.string().regex(/^[2-9]{1}[0-9]{11}$/, "Invalid Aadhaar Number format"),
+  kyc_consent: z.literal(true, { error: "KYC consent is required" }),
   address_line_1: z.string().min(1, "Address Line 1 is required"),
   address_line_2: z.string().optional(),
   state: z.string().min(1, "State is required"),
@@ -495,6 +496,12 @@ export default function RegisterPage() {
                           </div>
                           {errors.pincode && <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-1.5 text-xs text-red-600 ml-1 font-medium">{errors.pincode.message}</motion.p>}
                       </div>
+
+                      <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                        <input type="checkbox" className="mt-1" {...register("kyc_consent")} />
+                        <span>I consent to ShamBit processing my KYC details for agent verification. Aadhaar is encrypted at rest and only a masked value is displayed in the portal.</span>
+                      </label>
+                      {errors.kyc_consent && <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs font-medium text-red-600">{errors.kyc_consent.message}</motion.p>}
 
                       <div className="flex justify-center my-4 min-h-[65px] bg-slate-50 rounded-xl p-2 border border-slate-100">
                         <Turnstile

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Image, { ImageProps } from 'next/image';
 import { ImageIcon } from 'lucide-react';
+import { normalizeMediaUrl } from '@/lib/media';
 
 interface ImageWithFallbackProps extends ImageProps {
   fallbackSrc?: string;
@@ -14,12 +15,13 @@ export function ImageWithFallback({
   fallbackSrc = '/placeholder-hotel.jpg', 
   ...rest 
 }: ImageWithFallbackProps) {
-  const [imgSrc, setImgSrc] = useState(src);
+  const normalizedSrc = typeof src === 'string' ? normalizeMediaUrl(src) : src;
+  const [imgSrc, setImgSrc] = useState(normalizedSrc);
   const [hasError, setHasError] = useState(false);
-  const [prevSrc, setPrevSrc] = useState(src);
-  if (prevSrc !== src) {
-    setPrevSrc(src);
-    setImgSrc(src);
+  const [prevSrc, setPrevSrc] = useState(normalizedSrc);
+  if (prevSrc !== normalizedSrc) {
+    setPrevSrc(normalizedSrc);
+    setImgSrc(normalizedSrc);
     setHasError(false);
   }
 

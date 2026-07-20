@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import PublicPropertyView from '../../../components/property/PublicPropertyView';
+import { normalizeMediaItem } from '../../../lib/media';
 
 // Helper to fetch and securely scrub data
 async function getPublicHotelData(slug: string) {
@@ -39,7 +40,7 @@ async function getPublicHotelData(slug: string) {
       nearby_places: data.nearby_places || [],
       description: data.description || '',
       star_rating: data.star_rating || 3,
-      images: data.media || data.images || [],
+      images: (data.media || data.images || []).map(normalizeMediaItem),
       amenities: data.amenities || [],
       rooms: data.room_types || data.rooms || []
     };
@@ -59,7 +60,11 @@ async function getPublicHotelData(slug: string) {
       delete safeRoom.declared_tariff;
       
       // Ensure we keep media and amenities/facilities
-      safeRoom.media = room.media || [];
+      safeRoom.media = Array.isArray(room.media)
+        ? room.media.map((item) =>
+            normalizeMediaItem(item as { file_url?: string; image?: string }),
+          )
+        : [];
       safeRoom.amenities = room.amenities || [];
       safeRoom.facilities = room.facilities || [];
       

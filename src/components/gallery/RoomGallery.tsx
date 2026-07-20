@@ -9,6 +9,7 @@ import 'yet-another-react-lightbox/plugins/thumbnails.css';
 import Zoom from 'yet-another-react-lightbox/plugins/zoom';
 import Thumbnails from 'yet-another-react-lightbox/plugins/thumbnails';
 import Fullscreen from 'yet-another-react-lightbox/plugins/fullscreen';
+import { normalizeMediaItem } from '@/lib/media';
 
 const Lightbox = dynamic(() => import('yet-another-react-lightbox'), { ssr: false });
 
@@ -19,8 +20,9 @@ interface RoomGalleryProps {
 
 export default function RoomGallery({ images, roomName }: RoomGalleryProps) {
   const [open, setOpen] = useState(false);
+  const normalizedImages = (images || []).map(normalizeMediaItem);
 
-  if (!images || images.length === 0) {
+  if (normalizedImages.length === 0) {
     return (
       <div className="w-full h-full min-h-[200px] bg-slate-100 rounded-xl flex items-center justify-center">
         <ImageIcon className="w-8 h-8 text-slate-300" />
@@ -28,8 +30,8 @@ export default function RoomGallery({ images, roomName }: RoomGalleryProps) {
     );
   }
 
-  const primaryImage = images[0];
-  const slides = images.map(img => ({ src: img.file_url, alt: img.alt_text || roomName }));
+  const primaryImage = normalizedImages[0];
+  const slides = normalizedImages.map(img => ({ src: img.file_url, alt: img.alt_text || roomName }));
 
   return (
     <>
@@ -46,12 +48,12 @@ export default function RoomGallery({ images, roomName }: RoomGalleryProps) {
         />
         <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-300 pointer-events-none" />
         
-        {images.length > 1 && (
+        {normalizedImages.length > 1 && (
           <button 
             className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-md text-slate-900 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-md flex items-center gap-1.5 hover:bg-white transition-all transform hover:scale-105"
           >
             <Grid className="w-3.5 h-3.5" />
-            1 / {images.length}
+            1 / {normalizedImages.length}
           </button>
         )}
       </div>

@@ -30,6 +30,16 @@ interface OrderData {
   primary_guest_name?: string;
   contact_email?: string;
   contact_phone?: string;
+  expires_at?: string | null;
+  contract?: { id?: number; number?: string; version?: number };
+  events?: Array<{
+    event_type: string;
+    from_status: string;
+    to_status: string;
+    reason: string;
+    actor: string;
+    created_at: string;
+  }>;
   lines: OrderLine[];
 }
 
@@ -42,6 +52,8 @@ export default function BookingDetailsPage(props: { params: Promise<{ reference:
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [cancelling, setCancelling] = useState(false);
+  const [showCancellation, setShowCancellation] = useState(false);
+  const [cancellationReason, setCancellationReason] = useState('');
   const [downloading, setDownloading] = useState(false);
 
   const downloadVoucher = async () => {
@@ -68,11 +80,17 @@ export default function BookingDetailsPage(props: { params: Promise<{ reference:
   };
 
   const cancelBooking = async () => {
-    if (!orderData || !window.confirm('Cancel this booking and release its inventory?')) return;
+    const reason = cancellationReason.trim();
+    if (!orderData) return;
+    if (reason.length < 10) {
+      setError('Enter a cancellation reason of at least 10 characters.');
+      return;
+    }
+    if (!window.confirm('Submit this cancellation and release its inventory? This action is audited.')) return;
     try {
       setCancelling(true);
       setError('');
-      await api.post(`/b2b/orders/${reference}/cancel/`);
+      await api.post(`/b2b/orders/${reference}/cancel/`, { reason });
       setOrderData({
         ...orderData,
         status: 'CANCELLED',
@@ -134,12 +152,33 @@ export default function BookingDetailsPage(props: { params: Promise<{ reference:
             </button>
           )}
           {['DRAFT', 'CONFIRMED', 'PENDING_PAYMENT', 'PENDING_CONFIRMATION'].includes(orderData.status) && (
-            <button onClick={cancelBooking} disabled={cancelling} className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-60 font-medium text-sm">
+            <button onClick={() => setShowCancellation(current => !current)} disabled={cancelling} className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-60 font-medium text-sm">
               <XCircle className="w-4 h-4" /> {cancelling ? 'Cancelling…' : 'Cancel Booking'}
             </button>
           )}
         </div>
       </div>
+
+      {showCancellation && ['DRAFT', 'CONFIRMED', 'PENDING_PAYMENT', 'PENDING_CONFIRMATION'].includes(orderData.status) && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
+          <label className="block text-sm font-bold text-red-900">Cancellation reason</label>
+          <p className="mt-1 text-xs text-red-700">The reason, actor, timestamp and financial release are retained in the booking audit history.</p>
+          <textarea
+            value={cancellationReason}
+            onChange={(event) => setCancellationReason(event.target.value)}
+            rows={3}
+            maxLength={2000}
+            placeholder="Explain why this booking is being cancelled."
+            className="mt-3 w-full rounded-xl border border-red-200 bg-white p-3 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100"
+          />
+          <div className="mt-3 flex justify-end gap-3">
+            <button type="button" onClick={() => setShowCancellation(false)} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700">Keep booking</button>
+            <button type="button" onClick={cancelBooking} disabled={cancelling || cancellationReason.trim().length < 10} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+              {cancelling ? 'Cancelling…' : 'Confirm cancellation'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-6">
@@ -212,6 +251,27 @@ export default function BookingDetailsPage(props: { params: Promise<{ reference:
                 <span className="font-bold text-slate-800">Total Amount</span>
                 <span className="text-lg font-black text-slate-900">₹{parseFloat(orderData.b2b_selling_total || '0').toLocaleString()}</span>
               </div>
+              {orderData.expires_at && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+                  Action deadline: {new Date(orderData.expires_at).toLocaleString()}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-800 mb-4 border-b border-slate-100 pb-2">Contract & Audit History</h2>
+            <p className="text-sm text-slate-600">
+              Contract {orderData.contract?.number || `#${orderData.contract?.id || '—'}`} · Version {orderData.contract?.version || '—'}
+            </p>
+            <div className="mt-4 space-y-3">
+              {(orderData.events || []).map((event, index) => (
+                <div key={`${event.event_type}-${event.created_at}-${index}`} className="border-l-2 border-orange-300 pl-3 text-xs">
+                  <p className="font-bold text-slate-800">{event.event_type.replaceAll('_', ' ')}</p>
+                  <p className="text-slate-500">{event.actor} · {new Date(event.created_at).toLocaleString()}</p>
+                  {event.reason && <p className="mt-1 text-slate-600">{event.reason}</p>}
+                </div>
+              ))}
             </div>
           </div>
         </div>

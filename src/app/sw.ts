@@ -11,15 +11,19 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
+const isLocalDevelopmentHost = ["localhost", "127.0.0.1"].includes(
+  self.location.hostname,
+);
+
 const serwist = new Serwist({
   precacheEntries: [
-    ...(self.__SW_MANIFEST || [])
+    ...(isLocalDevelopmentHost ? [] : self.__SW_MANIFEST || [])
   ],
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
-  runtimeCaching: defaultCache,
-  fallbacks: {
+  runtimeCaching: isLocalDevelopmentHost ? [] : defaultCache,
+  fallbacks: isLocalDevelopmentHost ? undefined : {
     entries: [
       {
         url: "/~offline",
@@ -38,6 +42,34 @@ const serwist = new Serwist({
 });
 
 serwist.addEventListeners();
+
+// A production worker can remain registered after switching localhost back to
+// `next dev`. Retire it immediately so it cannot serve stale cards or API data.
+if (isLocalDevelopmentHost) {
+  self.addEventListener("install", (event) => {
+    event.waitUntil(self.skipWaiting());
+  });
+
+  self.addEventListener("activate", (event) => {
+    event.waitUntil(
+      (async () => {
+        const cacheNames = await self.caches.keys();
+        await Promise.all(cacheNames.map((cacheName) => self.caches.delete(cacheName)));
+        await self.registration.unregister();
+
+        const windowClients = await self.clients.matchAll({
+          type: "window",
+          includeUncontrolled: true,
+        });
+        await Promise.all(
+          windowClients.map((client) =>
+            "navigate" in client ? client.navigate(client.url) : undefined,
+          ),
+        );
+      })(),
+    );
+  });
+}
 
 // Listen to push events
 self.addEventListener('push', (event: any) => {

@@ -53,6 +53,7 @@ interface OrderData {
   total_guests: number;
   total_rooms: number;
   booking_mode: string;
+  expires_at?: string | null;
   lines: OrderLine[];
   pricing_snapshot: {
     b2c_total: string;
@@ -261,6 +262,11 @@ function CheckoutContent() {
           setError('Secure online payment could not be loaded. Ledger payment remains available.');
         }}
       />
+      {orderData?.expires_at && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
+          Inventory is held until {new Date(orderData.expires_at).toLocaleString()}. Complete checkout before this deadline.
+        </div>
+      )}
       <h1 className="text-2xl font-bold text-slate-900 font-playfair">Complete B2B Booking</h1>
       
       {success && <div className="p-4 rounded-xl bg-green-50 text-green-700 border border-green-100">{success}</div>}

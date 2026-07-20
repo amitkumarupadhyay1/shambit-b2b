@@ -9,6 +9,7 @@ import { Grid, Image as ImageIcon } from 'lucide-react';
 import Zoom from 'yet-another-react-lightbox/plugins/zoom';
 import Thumbnails from 'yet-another-react-lightbox/plugins/thumbnails';
 import Fullscreen from 'yet-another-react-lightbox/plugins/fullscreen';
+import { normalizeMediaItem } from '@/lib/media';
 
 const Lightbox = dynamic(() => import('yet-another-react-lightbox'), { ssr: false });
 
@@ -21,7 +22,9 @@ export default function PremiumGallery({ images, hotelName }: PremiumGalleryProp
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
 
-  if (!images || images.length === 0) {
+  const normalizedImages = (images || []).map(normalizeMediaItem);
+
+  if (normalizedImages.length === 0) {
     return (
       <div className="w-full h-64 md:h-96 bg-slate-100 rounded-3xl flex items-center justify-center">
         <ImageIcon className="w-12 h-12 text-slate-300" />
@@ -29,11 +32,11 @@ export default function PremiumGallery({ images, hotelName }: PremiumGalleryProp
     );
   }
 
-  const primaryImage = images.find(img => img.is_primary) || images[0];
-  const secondaryImages = images.filter(img => img.id !== primaryImage.id).slice(0, 4);
+  const primaryImage = normalizedImages.find(img => img.is_primary) || normalizedImages[0];
+  const secondaryImages = normalizedImages.filter(img => img.id !== primaryImage.id).slice(0, 4);
   
   // Format slides for Lightbox
-  const slides = images.map(img => ({ src: img.file_url || img.image || '', alt: img.alt_text || hotelName }));
+  const slides = normalizedImages.map(img => ({ src: img.file_url || img.image || '', alt: img.alt_text || hotelName }));
 
   const openLightbox = (idx: number) => {
     // Find the actual index in the full images array
@@ -48,7 +51,7 @@ export default function PremiumGallery({ images, hotelName }: PremiumGalleryProp
         {/* Primary Hero Image */}
         <div 
           className="col-span-2 row-span-2 relative cursor-pointer overflow-hidden"
-          onClick={() => openLightbox(images.findIndex(img => img.id === primaryImage.id))}
+          onClick={() => openLightbox(normalizedImages.findIndex(img => img.id === primaryImage.id))}
         >
           <Image 
             src={primaryImage.file_url || primaryImage.image || ''} 
@@ -66,7 +69,7 @@ export default function PremiumGallery({ images, hotelName }: PremiumGalleryProp
           <div 
             key={img.id} 
             className="relative cursor-pointer overflow-hidden"
-            onClick={() => openLightbox(images.findIndex(i => i.id === img.id))}
+            onClick={() => openLightbox(normalizedImages.findIndex(i => i.id === img.id))}
           >
             <Image 
               src={img.file_url || img.image || ''} 
@@ -114,7 +117,7 @@ export default function PremiumGallery({ images, hotelName }: PremiumGalleryProp
           className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-md text-slate-900 px-4 py-2 rounded-lg text-xs font-semibold shadow-md flex items-center gap-1.5"
         >
           <Grid className="w-3.5 h-3.5" />
-          1 / {images.length}
+          1 / {normalizedImages.length}
         </button>
       </div>
 

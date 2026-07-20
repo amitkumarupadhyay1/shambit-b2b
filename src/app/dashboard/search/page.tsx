@@ -143,9 +143,11 @@ function SearchContent() {
     return results.filter(hotel => {
       if (selectedStars.length > 0 && !selectedStars.includes(hotel.star_rating)) return false;
       
-      if (hotel.b2b_pricing && deferredMaxPrice < MAX_SLIDER_PRICE) {
-        const netRate = parseFloat(hotel.b2b_pricing.net_rate);
-        if (netRate > deferredMaxPrice) return false;
+      if (deferredMaxPrice < MAX_SLIDER_PRICE) {
+        const settledRates = [hotel.room_wise_rate?.amount, hotel.global_rate?.amount]
+          .map(value => Number.parseFloat(value || ''))
+          .filter(Number.isFinite);
+        if (!settledRates.length || Math.min(...settledRates) > deferredMaxPrice) return false;
       }
       
       if (selectedAmenities.length > 0) {
@@ -175,6 +177,7 @@ function SearchContent() {
     const params = new URLSearchParams({
       check_in: checkIn,
       check_out: checkOut,
+      adults: adults.toString(),
     });
     router.push(`/dashboard/hotel/${hotel.id}?${params.toString()}`);
   };
@@ -367,13 +370,12 @@ function SearchContent() {
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[1, 2, 3, 4, 5, 6].map((skeleton) => (
-                <div key={skeleton} className="bg-white/50 rounded-3xl border border-slate-100 shadow-sm h-[460px] animate-pulse overflow-hidden flex flex-col">
-                  <div className="h-60 bg-slate-200/50 w-full relative"></div>
-                  <div className="p-6 space-y-4 flex flex-col flex-1">
+                <div key={skeleton} className="bg-white/50 rounded-3xl border border-slate-100 shadow-sm h-[380px] animate-pulse overflow-hidden flex flex-col">
+                  <div className="h-[230px] bg-slate-200/50 w-full relative"></div>
+                  <div className="p-4 space-y-3 flex flex-col flex-1">
                     <div className="h-6 bg-slate-200 rounded-lg w-3/4"></div>
-                    <div className="h-4 bg-slate-100 rounded w-1/2 mb-4"></div>
-                    <div className="mt-auto h-24 bg-slate-50 rounded-2xl w-full"></div>
-                    <div className="h-14 bg-slate-200 rounded-2xl w-full mt-2"></div>
+                    <div className="h-4 bg-slate-100 rounded w-1/2"></div>
+                    <div className="mt-auto h-12 bg-slate-100 rounded-xl w-full"></div>
                   </div>
                 </div>
               ))}
@@ -381,7 +383,7 @@ function SearchContent() {
           ) : (
             <motion.div 
               layout
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
             >
               <AnimatePresence mode="popLayout">
                 {filteredResults.map((hotel) => (
