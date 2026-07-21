@@ -103,7 +103,7 @@ export default function GlobalBookingWidget({
                 Total Guests
               </label>
               <div className="flex items-center gap-3 border border-slate-200 rounded-xl p-2 w-fit bg-slate-50/50 transition-all duration-200 hover:border-orange-200">
-                <button onClick={() => onUpdateTotalGuests(Math.max(1, totalGuests - 1))} className="p-2 rounded-full border border-transparent transition-all duration-200 hover:bg-gradient-to-br hover:from-orange-500 hover:to-amber-500 hover:text-white hover:shadow-md hover:shadow-orange-200/50 focus:outline-none focus:ring-2 focus:ring-orange-400/50 focus:border-orange-400 active:scale-95"><Minus className="w-4 h-4"/></button>
+                <button onClick={() => onUpdateTotalGuests(Math.max(totalRooms, totalGuests - 1))} className="p-2 rounded-full border border-transparent transition-all duration-200 hover:bg-gradient-to-br hover:from-orange-500 hover:to-amber-500 hover:text-white hover:shadow-md hover:shadow-orange-200/50 focus:outline-none focus:ring-2 focus:ring-orange-400/50 focus:border-orange-400 active:scale-95"><Minus className="w-4 h-4"/></button>
                 <span className="font-bold w-8 text-center text-slate-800">{totalGuests}</span>
                 <button onClick={() => onUpdateTotalGuests(totalGuests + 1)} className="p-2 rounded-full border border-transparent transition-all duration-200 hover:bg-gradient-to-br hover:from-orange-500 hover:to-amber-500 hover:text-white hover:shadow-md hover:shadow-orange-200/50 focus:outline-none focus:ring-2 focus:ring-orange-400/50 focus:border-orange-400 active:scale-95"><Plus className="w-4 h-4"/></button>
               </div>

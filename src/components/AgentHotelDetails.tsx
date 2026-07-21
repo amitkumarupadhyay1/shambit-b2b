@@ -130,7 +130,7 @@ export default function AgentHotelDetails({ hotelId }: { hotelId: number }) {
   // Global selection state
   const [selectedGlobalPlanId, setSelectedGlobalPlanId] = useState<number | null>(null);
   const [globalTotalRooms, setGlobalTotalRooms] = useState(1);
-  const [globalTotalGuests, setGlobalTotalGuests] = useState(1);
+  const [globalTotalGuests, setGlobalTotalGuests] = useState(initialAdults);
   
   // Quote State
   const [quoting, setQuoting] = useState(false);
@@ -172,16 +172,27 @@ export default function AgentHotelDetails({ hotelId }: { hotelId: number }) {
     }));
     setRoomOccupancies(prev => {
       const existing = prev[roomId] || [];
-      const defaultOccupancy: RoomOccupancy = {
-        adults: Math.min(2, Math.max(1, room?.max_adults || 1)),
-        children: 0,
-        child_ages: [],
-        extra_beds: 0,
-        extra_mattresses: 0,
-      };
+      
+      let remainingAdults = Math.max(roomWiseAdults, normalizedQty);
+      const perRoom = Math.floor(remainingAdults / (normalizedQty || 1));
+      let remainder = remainingAdults % (normalizedQty || 1);
+
       return {
         ...prev,
-        [roomId]: Array.from({ length: normalizedQty }, (_, index) => existing[index] || defaultOccupancy),
+        [roomId]: Array.from({ length: normalizedQty }, (_, index) => {
+          if (existing[index]) return existing[index];
+          let adultsForThisRoom = perRoom + (index < remainder ? 1 : 0);
+          const maxAllowed = room?.max_adults || 2;
+          adultsForThisRoom = Math.max(1, Math.min(adultsForThisRoom, maxAllowed));
+          
+          return {
+            adults: adultsForThisRoom,
+            children: 0,
+            child_ages: [],
+            extra_beds: 0,
+            extra_mattresses: 0,
+          };
+        }),
       };
     });
   };
@@ -407,7 +418,10 @@ export default function AgentHotelDetails({ hotelId }: { hotelId: number }) {
                   }
                 }}
                 totalRooms={globalTotalRooms}
-                onUpdateTotalRooms={setGlobalTotalRooms}
+                onUpdateTotalRooms={(qty) => {
+                  setGlobalTotalRooms(qty);
+                  setGlobalTotalGuests(current => Math.max(current, qty));
+                }}
                 totalGuests={globalTotalGuests}
                 onUpdateTotalGuests={setGlobalTotalGuests}
               />
