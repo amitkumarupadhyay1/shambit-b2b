@@ -10,6 +10,9 @@ interface GlobalRatePlan {
   allocation_mode: string;
   confirmation_sla_minutes: number;
   terms_and_conditions?: string;
+  max_persons_per_room: number;
+  max_extra_persons: number;
+  extra_mattress_cost: number;
 }
 
 interface Props {
@@ -80,6 +83,15 @@ export default function GlobalBookingWidget({
               <p className="mt-2 text-xs">
                 Allowed quantity: {selectedPlan.min_rooms}–{selectedPlan.max_rooms ?? 'unlimited'} rooms.
               </p>
+              <div className="mt-2 text-xs flex flex-wrap gap-x-4 gap-y-1">
+                <span>Base Occupancy: {selectedPlan.max_persons_per_room} / room</span>
+                {selectedPlan.max_extra_persons > 0 && (
+                  <span>
+                    Max Extra: {selectedPlan.max_extra_persons} / room 
+                    (₹{selectedPlan.extra_mattress_cost}/person)
+                  </span>
+                )}
+              </div>
               {selectedPlan.terms_and_conditions && <p className="mt-2 text-xs">{selectedPlan.terms_and_conditions}</p>}
             </div>
           )}

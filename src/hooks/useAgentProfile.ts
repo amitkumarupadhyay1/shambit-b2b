@@ -9,6 +9,7 @@ export interface AgentProfileData {
   first_name: string;
   last_name: string;
   email: string;
+  is_totp_enabled: boolean;
   phone: string;
   agency_name: string;
   gst_number: string;

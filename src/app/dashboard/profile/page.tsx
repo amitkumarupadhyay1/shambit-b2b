@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import api from '../../../lib/api';
-import { Shield, Key, AlertCircle, CheckCircle, CheckCircle2, Eye, EyeOff, Bell, User, Briefcase, Lock, CreditCard } from 'lucide-react';
+import { Shield, Key, AlertCircle, CheckCircle, CheckCircle2, Eye, EyeOff, Bell, User, Briefcase, Lock, CreditCard, Smartphone } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useAgentProfile } from '@/hooks/useAgentProfile';
 import toast from 'react-hot-toast';
+import { QRCodeSVG } from 'qrcode.react';
 
 export default function ProfileSettingsPage() {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -16,8 +17,58 @@ export default function ProfileSettingsPage() {
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   
+  // 2FA State
+  const [totpSetupUri, setTotpSetupUri] = useState('');
+  const [totpCode, setTotpCode] = useState('');
+  const [totpLoading, setTotpLoading] = useState(false);
+  const [showTotpSetup, setShowTotpSetup] = useState(false);
+  
   const { isSupported, isSubscribed, subscribeToPush, unsubscribeFromPush } = usePushNotifications();
   const { profile, loading: profileLoading, updateProfile, updating } = useAgentProfile();
+
+  const handleGenerateTOTP = async () => {
+    try {
+      setTotpLoading(true);
+      const res = await api.post('/users/totp/generate/');
+      setTotpSetupUri(res.data.provisioning_uri);
+      setShowTotpSetup(true);
+    } catch {
+      toast.error('Failed to generate 2FA setup');
+    } finally {
+      setTotpLoading(false);
+    }
+  };
+
+  const handleVerifyTOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setTotpLoading(true);
+      await api.post('/users/totp/verify/', { code: totpCode });
+      toast.success('Two-Factor Authentication enabled successfully');
+      setShowTotpSetup(false);
+      setTotpCode('');
+      updateProfile({ ...profile, is_totp_enabled: true } as Record<string, unknown>);
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: string } } };
+      toast.error(err.response?.data?.error || 'Invalid verification code');
+    } finally {
+      setTotpLoading(false);
+    }
+  };
+
+  const handleDisableTOTP = async () => {
+    if (!window.confirm('Are you sure you want to disable Two-Factor Authentication? This will make your account less secure.')) return;
+    try {
+      setTotpLoading(true);
+      await api.post('/users/totp/disable/');
+      toast.success('Two-Factor Authentication disabled');
+      updateProfile({ ...profile, is_totp_enabled: false } as Record<string, unknown>);
+    } catch {
+      toast.error('Failed to disable 2FA');
+    } finally {
+      setTotpLoading(false);
+    }
+  };
 
   const [formData, setFormData] = useState({
     first_name: '',
@@ -448,6 +499,91 @@ export default function ProfileSettingsPage() {
             </div>
           ) : (
             <p className="text-sm text-slate-500">Push notifications are not supported in this browser.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Two-Factor Authentication */}
+      <div className="bg-white/70 backdrop-blur-xl rounded-[24px] border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden mb-8">
+        <div className="px-8 py-6 border-b border-slate-100 bg-white/40 flex items-center space-x-3">
+          <div className="p-2 bg-indigo-100 rounded-lg">
+            <Smartphone className="w-6 h-6 text-indigo-600" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900 font-playfair">Two-Factor Authentication (2FA)</h2>
+            <p className="text-sm text-slate-500 mt-1">Add an extra layer of security to your account</p>
+          </div>
+        </div>
+        <div className="p-8">
+          {profile?.is_totp_enabled ? (
+            <div>
+              <div className="flex items-center space-x-3 mb-4">
+                <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+                <span className="text-lg font-medium text-slate-900">2FA is Enabled</span>
+              </div>
+              <p className="text-slate-600 mb-6 text-sm">Your account is secured with Two-Factor Authentication using an authenticator app.</p>
+              <button
+                onClick={handleDisableTOTP}
+                disabled={totpLoading}
+                className="px-4 py-2 bg-red-50 text-red-600 font-medium rounded-xl hover:bg-red-100 transition-colors text-sm disabled:opacity-50"
+              >
+                Disable 2FA
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p className="text-slate-600 mb-6 text-sm">Protect your account from unauthorized access by requiring a second authentication step when you sign in.</p>
+              
+              {!showTotpSetup ? (
+                <button
+                  onClick={handleGenerateTOTP}
+                  disabled={totpLoading}
+                  className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors text-sm disabled:opacity-50"
+                >
+                  Enable 2FA
+                </button>
+              ) : (
+                <div className="space-y-6 max-w-md">
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <h3 className="font-medium text-slate-900 mb-2">1. Scan QR Code</h3>
+                    <p className="text-sm text-slate-600 mb-4">Use Google Authenticator, Authy, or any other TOTP app to scan this QR code.</p>
+                    <div className="bg-white p-4 inline-block rounded-xl shadow-sm border border-slate-100">
+                      {totpSetupUri ? <QRCodeSVG value={totpSetupUri} size={150} /> : <div className="w-[150px] h-[150px] bg-slate-100 animate-pulse rounded-lg" />}
+                    </div>
+                  </div>
+                  
+                  <form onSubmit={handleVerifyTOTP} className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <h3 className="font-medium text-slate-900 mb-2">2. Verify Code</h3>
+                    <p className="text-sm text-slate-600 mb-4">Enter the 6-digit code generated by your authenticator app.</p>
+                    <div className="flex space-x-3">
+                      <input
+                        type="text"
+                        value={totpCode}
+                        onChange={(e) => setTotpCode(e.target.value)}
+                        placeholder="000000"
+                        maxLength={6}
+                        className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                        required
+                      />
+                      <button
+                        type="submit"
+                        disabled={totpLoading || totpCode.length !== 6}
+                        className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm disabled:opacity-50"
+                      >
+                        Verify & Enable
+                      </button>
+                    </div>
+                  </form>
+                  
+                  <button
+                    onClick={() => { setShowTotpSetup(false); setTotpSetupUri(''); setTotpCode(''); }}
+                    className="text-sm text-slate-500 hover:text-slate-700"
+                  >
+                    Cancel Setup
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

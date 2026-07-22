@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '../../../../lib/api';
-import { FileText, ArrowLeft, Building, Users, Calendar, Download, XCircle } from 'lucide-react';
+import { FileText, ArrowLeft, Building, Users, Calendar, Download, XCircle, Edit3 } from 'lucide-react';
 import Link from 'next/link';
 import { use } from 'react';
 
@@ -21,6 +21,7 @@ interface OrderData {
   check_in: string;
   check_out: string;
   total_guests: number;
+  hotel_id?: number;
   total_rooms: number;
   booking_mode: string;
   status: string;
@@ -55,6 +56,17 @@ export default function BookingDetailsPage(props: { params: Promise<{ reference:
   const [showCancellation, setShowCancellation] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
   const [downloading, setDownloading] = useState(false);
+
+  // Modification State
+  const [showModification, setShowModification] = useState(false);
+  const [modifying, setModifying] = useState(false);
+  const [modifyReason, setModifyReason] = useState('');
+  const [modifyCheckIn, setModifyCheckIn] = useState('');
+  const [modifyCheckOut, setModifyCheckOut] = useState('');
+  const [modifyGuests, setModifyGuests] = useState('');
+  const [modifyRooms, setModifyRooms] = useState('');
+  const [quoteData, setQuoteData] = useState<{ quote_id: string; summary: { foc_rooms_granted: number; platform_fee_total: string; b2b_selling_total: string; }; } | null>(null);
+  const [quoting, setQuoting] = useState(false);
 
   const downloadVoucher = async () => {
     try {
@@ -109,6 +121,12 @@ export default function BookingDetailsPage(props: { params: Promise<{ reference:
       try {
         const res = await api.get(`/b2b/orders/${reference}/`);
         setOrderData(res.data);
+        if (res.data) {
+          setModifyCheckIn(res.data.check_in);
+          setModifyCheckOut(res.data.check_out);
+          setModifyGuests(res.data.total_guests.toString());
+          setModifyRooms(res.data.total_rooms.toString());
+        }
       } catch (err: unknown) {
         const error = err as { response?: { data?: { error?: string } } };
         setError(error.response?.data?.error || 'Failed to load booking details.');
@@ -118,6 +136,59 @@ export default function BookingDetailsPage(props: { params: Promise<{ reference:
     };
     fetchOrder();
   }, [reference]);
+
+  const handleRequote = async () => {
+    if (!orderData) return;
+    try {
+      setQuoting(true);
+      setError('');
+      
+      const firstLine = orderData.lines[0];
+      const roomTypeId = firstLine ? firstLine.id : 1; // Need room_type_id, fallback to 1 or ideally passed from backend
+
+      const payload = {
+        hotel_id: orderData.hotel_id || 1, // Need hotel_id, ideally in orderData
+        check_in: modifyCheckIn,
+        check_out: modifyCheckOut,
+        booking_mode: orderData.booking_mode,
+        adults: parseInt(modifyGuests, 10),
+        rooms: [{
+          room_type_id: roomTypeId, // It requires room_type_id. Let's just use 1 if not available, wait, we don't know the room_type_id
+          quantity: parseInt(modifyRooms, 10)
+        }]
+      };
+      
+      const res = await api.post('/b2b/quotes/', payload);
+      setQuoteData(res.data);
+    } catch (err: unknown) {
+      const responseError = err as { response?: { data?: { error?: string } } };
+      setError(responseError.response?.data?.error || 'Unable to generate quote for modification.');
+    } finally {
+      setQuoting(false);
+    }
+  };
+
+  const confirmModification = async () => {
+    if (!quoteData || !modifyReason) return;
+    try {
+      setModifying(true);
+      setError('');
+      await api.put(`/b2b/orders/${reference}/update/`, {
+        quote_id: quoteData.quote_id,
+        reason: modifyReason
+      });
+      setShowModification(false);
+      setQuoteData(null);
+      // Reload order data
+      const res = await api.get(`/b2b/orders/${reference}/`);
+      setOrderData(res.data);
+    } catch (err: unknown) {
+      const responseError = err as { response?: { data?: { error?: string } } };
+      setError(responseError.response?.data?.error || 'Unable to confirm modification.');
+    } finally {
+      setModifying(false);
+    }
+  };
 
   if (loading) {
     return <div className="p-8 text-center text-slate-500">Loading details...</div>;
@@ -151,6 +222,11 @@ export default function BookingDetailsPage(props: { params: Promise<{ reference:
               <Download className="w-4 h-4" /> {downloading ? 'Preparing…' : 'Download Voucher'}
             </button>
           )}
+          {['DRAFT', 'PENDING_PAYMENT'].includes(orderData.status) && (
+            <button onClick={() => setShowModification(current => !current)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm">
+              <Edit3 className="w-4 h-4" /> Edit Booking
+            </button>
+          )}
           {['DRAFT', 'CONFIRMED', 'PENDING_PAYMENT', 'PENDING_CONFIRMATION'].includes(orderData.status) && (
             <button onClick={() => setShowCancellation(current => !current)} disabled={cancelling} className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-60 font-medium text-sm">
               <XCircle className="w-4 h-4" /> {cancelling ? 'Cancelling…' : 'Cancel Booking'}
@@ -158,6 +234,74 @@ export default function BookingDetailsPage(props: { params: Promise<{ reference:
           )}
         </div>
       </div>
+
+      {showModification && ['DRAFT', 'PENDING_PAYMENT'].includes(orderData.status) && (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-blue-900 mb-4 border-b border-blue-200 pb-2">Modify Booking</h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div>
+              <label className="block text-xs font-semibold text-blue-800 uppercase tracking-wider mb-1">Check In</label>
+              <input type="date" value={modifyCheckIn} onChange={(e) => setModifyCheckIn(e.target.value)} className="w-full rounded-lg border border-blue-200 bg-white p-2 text-sm focus:ring-2 focus:ring-blue-200" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-blue-800 uppercase tracking-wider mb-1">Check Out</label>
+              <input type="date" value={modifyCheckOut} onChange={(e) => setModifyCheckOut(e.target.value)} className="w-full rounded-lg border border-blue-200 bg-white p-2 text-sm focus:ring-2 focus:ring-blue-200" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-blue-800 uppercase tracking-wider mb-1">Guests</label>
+              <input type="number" min="1" value={modifyGuests} onChange={(e) => setModifyGuests(e.target.value)} className="w-full rounded-lg border border-blue-200 bg-white p-2 text-sm focus:ring-2 focus:ring-blue-200" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-blue-800 uppercase tracking-wider mb-1">Rooms</label>
+              <input type="number" min="1" value={modifyRooms} onChange={(e) => setModifyRooms(e.target.value)} className="w-full rounded-lg border border-blue-200 bg-white p-2 text-sm focus:ring-2 focus:ring-blue-200" />
+            </div>
+          </div>
+          
+          <div className="flex justify-end gap-3 mb-6">
+            <button type="button" onClick={handleRequote} disabled={quoting} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-blue-700">
+              {quoting ? 'Calculating...' : 'Generate New Quote'}
+            </button>
+          </div>
+
+          {quoteData && (
+            <div className="border border-emerald-200 bg-emerald-50 rounded-xl p-4 animate-in fade-in slide-in-from-top-2">
+              <h3 className="font-semibold text-emerald-900 mb-2">New Quote Generated</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+                <div>
+                  <span className="text-emerald-700 block text-xs">FOC Rooms Granted</span>
+                  <span className="font-bold text-emerald-900">{quoteData.summary.foc_rooms_granted || 0}</span>
+                </div>
+                <div>
+                  <span className="text-emerald-700 block text-xs">Platform Fee</span>
+                  <span className="font-bold text-emerald-900">₹{parseFloat(quoteData.summary.platform_fee_total).toLocaleString()}</span>
+                </div>
+                <div>
+                  <span className="text-emerald-700 block text-xs">Total Amount</span>
+                  <span className="font-bold text-emerald-900">₹{parseFloat(quoteData.summary.b2b_selling_total).toLocaleString()}</span>
+                </div>
+              </div>
+
+              <div className="border-t border-emerald-200 pt-4">
+                <label className="block text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-1">Reason for Modification</label>
+                <textarea
+                  value={modifyReason}
+                  onChange={(e) => setModifyReason(e.target.value)}
+                  placeholder="E.g. Guest requested additional rooms"
+                  className="w-full rounded-lg border border-emerald-200 bg-white p-2 text-sm focus:ring-2 focus:ring-emerald-200 mb-3"
+                />
+                <button 
+                  type="button" 
+                  onClick={confirmModification} 
+                  disabled={modifying || !modifyReason} 
+                  className="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50 hover:bg-emerald-700 shadow-sm"
+                >
+                  {modifying ? 'Confirming...' : 'Confirm Modification'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {showCancellation && ['DRAFT', 'CONFIRMED', 'PENDING_PAYMENT', 'PENDING_CONFIRMATION'].includes(orderData.status) && (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-5">

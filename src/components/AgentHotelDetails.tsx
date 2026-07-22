@@ -57,6 +57,9 @@ interface HotelDetails {
     allocation_mode: string;
     confirmation_sla_minutes: number;
     terms_and_conditions?: string;
+    max_persons_per_room: number;
+    max_extra_persons: number;
+    extra_mattress_cost: number;
   }[];
   pricing_mode: 'ROOM_WISE' | 'GLOBAL' | 'BOTH' | null;
   contract_version: number | null;
@@ -66,8 +69,21 @@ interface QuoteLine {
   room_type_name?: string;
   line_type?: string;
   quantity: number;
+  billed_quantity?: number;
+  foc_quantity?: number;
+  foc_discount_total?: string;
+  extra_guest_charges?: {
+    extra_adults?: number;
+    extra_children?: number;
+    extra_beds?: number;
+    extra_mattresses?: number;
+    pay_at_hotel_total?: string;
+  };
   pricing: {
     b2c_total?: string;
+    extra_guest_b2b_selling_total?: string;
+    extra_guest_pay_at_hotel_total?: string;
+    foc_discount_total?: string;
     final_b2b_selling_total?: string;
   };
 }
@@ -79,6 +95,13 @@ interface QuoteResult {
   summary: {
     b2c_total: string;
     agent_tac_total: string;
+    b2b_selling_subtotal?: string;
+    platform_fee_total?: string;
+    coupon_discount_amount?: string;
+    coupon_code?: string | null;
+    foc_rooms_granted?: number;
+    foc_discount_total?: string;
+    final_b2b_selling_total?: string;
     b2b_selling_total: string;
   };
   lines: QuoteLine[];
@@ -173,9 +196,9 @@ export default function AgentHotelDetails({ hotelId }: { hotelId: number }) {
     setRoomOccupancies(prev => {
       const existing = prev[roomId] || [];
       
-      let remainingAdults = Math.max(roomWiseAdults, normalizedQty);
+      const remainingAdults = Math.max(roomWiseAdults, normalizedQty);
       const perRoom = Math.floor(remainingAdults / (normalizedQty || 1));
-      let remainder = remainingAdults % (normalizedQty || 1);
+      const remainder = remainingAdults % (normalizedQty || 1);
 
       return {
         ...prev,

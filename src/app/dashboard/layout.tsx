@@ -45,6 +45,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, []);
 
   const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (e) {
+      console.error('Logout error:', e);
+    }
     await signOut({ callbackUrl: '/login' });
   };
 
@@ -141,9 +146,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               <Menu className="h-5 w-5" />
             </button>
-            <h1 className="text-xl font-semibold text-slate-800 font-playfair capitalize tracking-wide drop-shadow-sm">
-              {pathname.endsWith('/search') ? 'Find Premium B2B Inventory' : (pathname.split('/').pop()?.replace('-', ' ') || 'Dashboard')}
-            </h1>
+            <div className="flex flex-col">
+              <h1 className="text-xl font-semibold text-slate-800 font-playfair capitalize tracking-wide drop-shadow-sm">
+                {pathname.includes('/hotel/') 
+                  ? 'Hotel Details' 
+                  : pathname.endsWith('/search') 
+                    ? 'Find Premium B2B Inventory' 
+                    : pathname.endsWith('/ledger')
+                      ? 'Ledger & Transactions'
+                      : (pathname.split('/').pop()?.replace('-', ' ') || 'Dashboard')}
+              </h1>
+              {pathname.endsWith('/ledger') && (
+                <p className="text-xs text-slate-500 mt-0.5 hidden sm:block">
+                  Transparent, immutable record of all your financial activities and booking charges.
+                </p>
+              )}
+            </div>
           </div>
           
           <div className="flex items-center relative z-10" ref={profileRef}>

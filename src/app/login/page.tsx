@@ -22,6 +22,12 @@ function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+  
+  // TOTP State
+  const [totpRequired, setTotpRequired] = useState(false)
+  const [tempToken, setTempToken] = useState("")
+  const [totpCode, setTotpCode] = useState("")
+
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -40,7 +46,7 @@ function LoginForm() {
   })
 
   const onSubmit = async (data: LoginFormValues) => {
-    if (!turnstileToken) {
+    if (!turnstileToken && !totpRequired) {
       setError("Please complete the security verification.")
       return
     }
@@ -49,30 +55,72 @@ function LoginForm() {
     setError("")
 
     try {
-      const result = await signIn("credentials", {
-        redirect: false,
-        email: data.email,
-        password: data.password,
-        turnstile_token: turnstileToken,
-      })
-
-      if (result?.error) {
-        if (!result.error.includes("429")) {
-          turnstileRef.current?.reset()
-          setTurnstileToken('')
-          setTurnstileStatus('loading')
+      if (!totpRequired) {
+        const preLoginRes = await fetch('/api/auth/pre-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: data.email,
+            password: data.password,
+            turnstile_token: turnstileToken
+          })
+        })
+        
+        const preLoginData = await preLoginRes.json()
+        
+        if (!preLoginRes.ok) {
+           setError(preLoginData.error || "Invalid email or password")
+           if (preLoginRes.status !== 429) {
+             turnstileRef.current?.reset()
+             setTurnstileToken('')
+             setTurnstileStatus('loading')
+           }
+           setLoading(false)
+           return
         }
-
-        if (result.error.includes("403") || result.error.includes("AccessDenied")) {
-          setError("Security verification failed. Please refresh and try again.")
-        } else if (result.error.includes("429")) {
-          setError("Too many login attempts. Please try again later.")
+        
+        if (preLoginData.totp_required) {
+           setTempToken(preLoginData.temp_token)
+           setTotpRequired(true)
+           setLoading(false)
+           return
+        }
+        
+        const result = await signIn("credentials", {
+           redirect: false,
+           type: 'tokens',
+           access: preLoginData.access,
+           refresh: preLoginData.refresh,
+           id: preLoginData.user?.id || '1',
+           email: preLoginData.user?.email,
+           name: preLoginData.user?.name || (preLoginData.user?.first_name ? `${preLoginData.user.first_name} ${preLoginData.user.last_name || ''}`.trim() : ''),
+           phone: preLoginData.user?.phone || ''
+        })
+        
+        if (result?.error) {
+           setError("Authentication error. Please try again.")
         } else {
-          setError("Invalid email or password")
+           router.push(returnUrl)
+           router.refresh()
         }
       } else {
-        router.push(returnUrl)
-        router.refresh()
+        const result = await signIn("credentials", {
+          redirect: false,
+          type: 'totp',
+          temp_token: tempToken,
+          totp_code: totpCode,
+        })
+        
+        if (result?.error) {
+          if (result.error.includes("429")) {
+            setError("Too many login attempts. Please try again later.")
+          } else {
+            setError("Invalid 2FA code.")
+          }
+        } else {
+          router.push(returnUrl)
+          router.refresh()
+        }
       }
     } catch {
       setError("An unexpected error occurred")
@@ -91,12 +139,39 @@ function LoginForm() {
       description="Sign in to your agent dashboard to manage your operations."
     >
       {/* eslint-disable-next-line react-hooks/refs */}
-      <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
+      <form className="space-y-6" onSubmit={totpRequired ? (e) => { e.preventDefault(); onSubmit({} as LoginFormValues) } : handleSubmit(onSubmit)}>
         {error && (
           <div className="p-3 text-sm text-red-600 bg-red-50 rounded-xl border border-red-100 text-center">
             {error}
           </div>
         )}
+
+        {totpRequired ? (
+          <div>
+            <label htmlFor="totpCode" className="block text-sm font-medium text-slate-700 ml-1">
+              Authenticator Code
+            </label>
+            <div className="mt-2 relative">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <Lock className="h-5 w-5 text-slate-400" />
+              </div>
+              <input
+                id="totpCode"
+                type="text"
+                autoComplete="one-time-code"
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value)}
+                maxLength={6}
+                className="block w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm transition-all bg-white outline-none"
+                placeholder="000000"
+              />
+            </div>
+            <p className="mt-2 text-xs text-slate-500 ml-1">
+              Open your authenticator app to get your 6-digit code.
+            </p>
+          </div>
+        ) : (
+          <>
 
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-slate-700 ml-1">
@@ -199,6 +274,9 @@ function LoginForm() {
             }}
           />
         </div>
+
+          </>
+        )}
 
         <div>
           <button

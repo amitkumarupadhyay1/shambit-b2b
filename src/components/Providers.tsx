@@ -12,12 +12,28 @@ function AxiosInterceptor({ children }: { children: React.ReactNode }) {
     const requestInterceptor = api.interceptors.request.use((config) => {
       if (session?.accessToken) {
         config.headers.Authorization = `Bearer ${session.accessToken}`;
+      } else {
+        delete config.headers.Authorization;
       }
       return config;
     });
 
+    const responseInterceptor = api.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          // Trigger logout if token expires or is invalid
+          import('next-auth/react').then(({ signOut }) => {
+            signOut({ callbackUrl: '/login' });
+          });
+        }
+        return Promise.reject(error);
+      }
+    );
+
     return () => {
       api.interceptors.request.eject(requestInterceptor);
+      api.interceptors.response.eject(responseInterceptor);
     };
   }, [session]);
 
